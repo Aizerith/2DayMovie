@@ -6,7 +6,7 @@ export type AppTheme = 'boilerplate' | 'boilerplate-dark';
   providedIn: 'root',
 })
 export class ThemeService {
-  private readonly themeKey = 'bp_theme';
+  private readonly themeKey = '2daymovie_theme';
   readonly theme = signal<AppTheme>(this.readTheme());
 
   setTheme(theme: AppTheme): void {
@@ -20,6 +20,6 @@ export class ThemeService {
 
   private readTheme(): AppTheme {
     const storedTheme = localStorage.getItem(this.themeKey);
-    return storedTheme === 'boilerplate-dark' ? 'boilerplate-dark' : 'boilerplate';
+    return storedTheme === 'boilerplate' ? 'boilerplate' : 'boilerplate-dark';
   }
 }

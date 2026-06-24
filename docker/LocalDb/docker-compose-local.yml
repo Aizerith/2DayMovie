@@ -1,12 +1,10 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:16
-    container_name: boilerplate-postgres
+    container_name: 2daymovie-postgres
     restart: always
     environment:
-      POSTGRES_DB: boilerplate_db
+      POSTGRES_DB: 2daymovie_db
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:

@@ -1,11 +1,8 @@
 package com.example.backend.common.config;
 
-import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Contact;
 import io.swagger.v3.oas.models.info.Info;
-import io.swagger.v3.oas.models.security.SecurityRequirement;
-import io.swagger.v3.oas.models.security.SecurityScheme;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -13,23 +10,14 @@ import org.springframework.context.annotation.Configuration;
 public class OpenApiConfig {
 
     @Bean
-    public OpenAPI boilerplateOpenApi() {
-        String bearerSchemeName = "bearerAuth";
-
+    public OpenAPI twoDayMovieOpenApi() {
         return new OpenAPI()
                 .info(new Info()
-                        .title("BoilerPlate Spring Angular API")
-                        .description("Documentation OpenAPI du boilerplate avec auth JWT, roles et modules CRUD de reference.")
+                        .title("2DayMovie API")
+                        .description("API de salons video prives avec upload MinIO, PIN et synchronisation temps reel.")
                         .version("v1")
                         .contact(new Contact()
-                                .name("BoilerPlate Spring Angular")
-                                .url("https://example.local")))
-                .addSecurityItem(new SecurityRequirement().addList(bearerSchemeName))
-                .components(new Components()
-                        .addSecuritySchemes(bearerSchemeName, new SecurityScheme()
-                                .name(bearerSchemeName)
-                                .type(SecurityScheme.Type.HTTP)
-                                .scheme("bearer")
-                                .bearerFormat("JWT")));
+                                .name("2DayMovie")
+                                .url("https://example.local")));
     }
 }

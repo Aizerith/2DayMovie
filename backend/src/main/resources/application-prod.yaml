@@ -3,19 +3,6 @@ spring:
     url: ${DB_URL}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
-
-  mail:
-    host: ${MAIL_HOST:localhost}
-    port: ${MAIL_PORT:1025}
-    username: ${MAIL_USERNAME:}
-    password: ${MAIL_PASSWORD:}
-    properties:
-      mail:
-        smtp:
-          auth: ${MAIL_SMTP_AUTH:false}
-          starttls:
-            enable: ${MAIL_SMTP_STARTTLS:false}
-
   jpa:
     hibernate:
       ddl-auto: none
@@ -49,25 +36,7 @@ app:
     public-endpoint: ${STORAGE_PUBLIC_ENDPOINT:http://localhost:9000}
     access-key: ${STORAGE_ACCESS_KEY:minioadmin}
     secret-key: ${STORAGE_SECRET_KEY:minioadmin}
-    bucket: ${STORAGE_BUCKET:boilerplate-files}
+    bucket: ${STORAGE_BUCKET:2daymovie-videos}
+    public-url-base: ${STORAGE_PUBLIC_URL_BASE:}
     presigned-expiry-minutes: ${STORAGE_PRESIGNED_EXPIRY_MINUTES:15}
-    max-file-size-bytes: ${STORAGE_MAX_FILE_SIZE_BYTES:20971520}
-    allowed-content-types: ${STORAGE_ALLOWED_CONTENT_TYPES:image/*,application/pdf,text/*,text/csv,application/json,application/zip,application/msword,application/vnd.ms-excel,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.presentationml.presentation}
-  auth:
-    password-reset-token-expiration-minutes: ${PASSWORD_RESET_TOKEN_EXPIRATION_MINUTES:30}
-    email-verification-token-expiration-minutes: ${EMAIL_VERIFICATION_TOKEN_EXPIRATION_MINUTES:1440}
-    expired-token-cleanup-fixed-delay-ms: ${EXPIRED_TOKEN_CLEANUP_FIXED_DELAY_MS:86400000}
-  security:
-    rate-limit:
-      enabled: ${RATE_LIMIT_ENABLED:true}
-      max-requests: ${RATE_LIMIT_MAX_REQUESTS:10}
-      window-seconds: ${RATE_LIMIT_WINDOW_SECONDS:60}
-  mail:
-    smtp-enabled: ${MAIL_ENABLED:false}
-    from-address: ${MAIL_FROM:no-reply@boilerplate.local}
-    dev-inbox-enabled: ${MAIL_DEV_INBOX_ENABLED:false}
-    dev-inbox-max-entries: ${MAIL_DEV_INBOX_MAX_ENTRIES:50}
-  jwt:
-    secret: ${JWT_SECRET}
-    access-token-expiration-minutes: ${JWT_ACCESS_TOKEN_EXPIRATION_MINUTES:15}
-    refresh-token-expiration-days: ${JWT_REFRESH_TOKEN_EXPIRATION_DAYS:7}
+    max-file-size-bytes: ${STORAGE_MAX_FILE_SIZE_BYTES:5368709120}

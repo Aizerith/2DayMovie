@@ -1,76 +1,139 @@
+import {HttpClient, HttpEventType} from '@angular/common/http';
 import {Component, computed, inject, signal} from '@angular/core';
+import {FormsModule} from '@angular/forms';
 import {RouterLink} from '@angular/router';
-import {TranslocoPipe} from '@jsverse/transloco';
-import {AuthService} from '../../core/services/auth.service';
-import {I18nService} from '../../core/i18n/i18n.service';
-import {HealthService} from '../../core/services/health.service';
-import {EmptyState} from '../../shared/ui/empty-state/empty-state';
-import {DataList, DataListColumn, DataListRow} from '../../shared/ui/data-list/data-list';
-import {NoticeBanner} from '../../shared/ui/notice-banner/notice-banner';
-import {PageIntro} from '../../shared/ui/page-intro/page-intro';
-import {SectionCard} from '../../shared/ui/section-card/section-card';
-import {StatPanel, StatPanelItem} from '../../shared/ui/stat-panel/stat-panel';
+import {Observable, concat, finalize, last, switchMap, tap} from 'rxjs';
+import {environment} from '../../../environments/environment';
+import {NotificationService} from '../../core/services/notification.service';
+import {CreateWatchRoomResponse, WatchRoomService} from '../../core/services/watch-room.service';
 
 @Component({
   selector: 'app-home',
   imports: [
-    RouterLink,
-    TranslocoPipe,
-    EmptyState,
-    DataList,
-    NoticeBanner,
-    PageIntro,
-    SectionCard,
-    StatPanel
+    FormsModule,
+    RouterLink
   ],
   templateUrl: './home.html',
 })
 export class Home {
-  private readonly healthService = inject(HealthService);
-  private readonly i18nService = inject(I18nService);
-  readonly authService = inject(AuthService);
-  readonly currentUser = this.authService.currentUser;
-  readonly message = signal('');
-  readonly demoCredentials = computed<StatPanelItem[]>(() => {
-    this.i18nService.activeLang();
+  private readonly watchRoomService = inject(WatchRoomService);
+  private readonly http = inject(HttpClient);
+  private readonly notificationService = inject(NotificationService);
 
-    return [
-      {label: this.i18nService.t('home.credentials.email'), value: 'admin@local.dev'},
-      {label: this.i18nService.t('home.credentials.password'), value: 'Admin123!'}
+  readonly title = signal('');
+  readonly pin = signal('');
+  readonly videoFile = signal<File | null>(null);
+  readonly subtitleFile = signal<File | null>(null);
+  readonly generatedPin = signal('');
+  readonly creating = signal(false);
+  readonly uploadProgress = signal(0);
+  readonly createdRoom = signal<CreateWatchRoomResponse | null>(null);
+  readonly shareLink = computed(() => this.createdRoom()?.shareUrl ?? '');
+
+  selectVideo(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    this.videoFile.set(input.files?.[0] ?? null);
+  }
+
+  selectSubtitle(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    this.subtitleFile.set(input.files?.[0] ?? null);
+  }
+
+  createRoom(): void {
+    const video = this.videoFile();
+    const subtitle = this.subtitleFile();
+
+    if (!video) {
+      this.notificationService.warning('Choisis une video avant de creer le salon.');
+      return;
+    }
+
+    const pin = this.generatePin();
+    this.pin.set(pin);
+    this.generatedPin.set(pin);
+    this.creating.set(true);
+    this.uploadProgress.set(0);
+    this.createdRoom.set(null);
+
+    this.watchRoomService.createRoom({
+      title: this.title().trim() || video.name,
+      pin,
+      video: this.toAsset(video),
+      subtitle: subtitle ? this.toAsset(subtitle, 'text/vtt') : null
+    }).pipe(
+      switchMap(room => this.uploadAssets(room, video, subtitle).pipe(
+        last(),
+        switchMap(() => this.watchRoomService.completeRoom(room.shareCode, pin)),
+        tap(() => {
+          this.createdRoom.set(this.withFrontendShareUrl(room));
+          this.uploadProgress.set(100);
+          this.notificationService.success('Salon pret. Le lien peut etre partage.');
+        })
+      )),
+      finalize(() => this.creating.set(false))
+    ).subscribe({
+      error: () => this.notificationService.error('Impossible de creer le salon pour le moment.')
+    });
+  }
+
+  copyLink(): void {
+    const link = this.shareLink();
+    if (!link) {
+      return;
+    }
+
+    void navigator.clipboard.writeText(link);
+    this.notificationService.success('Lien copie.');
+  }
+
+  private uploadAssets(room: CreateWatchRoomResponse, video: File, subtitle: File | null): Observable<unknown> {
+    const uploads = [
+      {url: room.videoUpload.url, file: video}
     ];
-  });
-  readonly foundationColumns = computed<DataListColumn[]>(() => {
-    this.i18nService.activeLang();
 
-    return [
-      {key: 'bloc', label: this.i18nService.t('home.foundationColumns.block')},
-      {key: 'etat', label: this.i18nService.t('home.foundationColumns.state')},
-      {key: 'usage', label: this.i18nService.t('home.foundationColumns.usage')}
-    ];
-  });
-  readonly foundationRows = computed<DataListRow[]>(() => {
-    this.i18nService.activeLang();
+    if (subtitle && room.subtitleUpload) {
+      uploads.push({url: room.subtitleUpload.url, file: subtitle});
+    }
 
-    return [
-      {
-        bloc: this.i18nService.t('home.foundationRows.auth.block'),
-        etat: this.i18nService.t('home.foundationRows.auth.state'),
-        usage: this.i18nService.t('home.foundationRows.auth.usage')
-      },
-      {
-        bloc: this.i18nService.t('home.foundationRows.layouts.block'),
-        etat: this.i18nService.t('home.foundationRows.layouts.state'),
-        usage: this.i18nService.t('home.foundationRows.layouts.usage')
-      },
-      {
-        bloc: this.i18nService.t('home.foundationRows.sharedUi.block'),
-        etat: this.i18nService.t('home.foundationRows.sharedUi.state'),
-        usage: this.i18nService.t('home.foundationRows.sharedUi.usage')
-      }
-    ];
-  });
+    let completed = 0;
+    return concat(...uploads.map(upload => this.http.put(upload.url, upload.file, {
+      reportProgress: true,
+      observe: 'events',
+      headers: {'Content-Type': upload.file.type || 'application/octet-stream'}
+    }).pipe(
+      tap(event => {
+        if (event.type === HttpEventType.UploadProgress && event.total) {
+          const base = (completed / uploads.length) * 100;
+          const current = (event.loaded / event.total) * (100 / uploads.length);
+          this.uploadProgress.set(Math.min(99, Math.round(base + current)));
+        }
 
-  testCall(): void {
-    this.healthService.getHealth().subscribe(value => this.message.set(value));
+        if (event.type === HttpEventType.Response) {
+          completed += 1;
+          this.uploadProgress.set(Math.round((completed / uploads.length) * 100));
+        }
+      })
+    )));
+  }
+
+  private toAsset(file: File, fallbackType = 'application/octet-stream') {
+    return {
+      originalFilename: file.name,
+      contentType: file.type || fallbackType,
+      sizeBytes: file.size
+    };
+  }
+
+  private withFrontendShareUrl(room: CreateWatchRoomResponse): CreateWatchRoomResponse {
+    const origin = environment.frontendUrl || window.location.origin;
+    return {
+      ...room,
+      shareUrl: `${origin}/watch/${room.shareCode}`
+    };
+  }
+
+  private generatePin(): string {
+    return Math.floor(1000 + Math.random() * 9000).toString();
   }
 }

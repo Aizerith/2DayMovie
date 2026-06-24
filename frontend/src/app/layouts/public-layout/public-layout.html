@@ -1,16 +1,11 @@
 <div [attr.data-theme]="theme()" class="min-h-screen bg-base-200 text-base-content">
-  <div class="navbar px-4">
+  <div class="navbar border-b border-white/10 bg-base-200/80 px-4 backdrop-blur">
     <div class="mx-auto flex w-full max-w-6xl items-center justify-between">
-      <a routerLink="/" class="btn btn-ghost px-2 text-lg font-black tracking-tight">{{ 'common.appName' | transloco }}</a>
+      <a routerLink="/" class="btn btn-ghost px-2 text-lg font-black tracking-tight">2DayMovie</a>
 
       <div class="flex items-center gap-2">
-        <div class="join">
-          <button class="join-item btn btn-ghost btn-sm" type="button" [class.btn-active]="activeLang() === 'fr'" (click)="setLanguage('fr')">FR</button>
-          <button class="join-item btn btn-ghost btn-sm" type="button" [class.btn-active]="activeLang() === 'en'" (click)="setLanguage('en')">EN</button>
-        </div>
-
         <button class="btn btn-ghost btn-sm" type="button" (click)="toggleTheme()">
-          {{ 'shell.theme' | transloco }}: {{ themeLabel() }}
+          Theme
         </button>
       </div>
     </div>

@@ -1,0 +1,64 @@
+<section class="px-4 py-8">
+  <div class="mx-auto w-full max-w-6xl space-y-5">
+    <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+      <div>
+        <a routerLink="/" class="link link-hover text-sm text-base-content/60">Retour</a>
+        <h1 class="text-2xl font-black md:text-4xl">{{ room()?.title || 'Salon prive' }}</h1>
+      </div>
+      @if (room()) {
+        <div class="badge" [class.badge-success]="connected()" [class.badge-warning]="!connected()">
+          {{ connected() ? 'Synchronise' : 'Connexion...' }}
+        </div>
+      }
+    </div>
+
+    @if (!room()) {
+      <form class="mx-auto max-w-sm rounded-lg border border-white/10 bg-base-100 p-5" (ngSubmit)="unlock()">
+        <div class="space-y-4">
+          <div>
+            <h2 class="text-xl font-bold">Entrer dans le salon</h2>
+            <p class="text-sm text-base-content/60">Le lien est protege par un PIN a 4 chiffres.</p>
+          </div>
+          <input class="input input-bordered w-full text-center font-mono text-xl tracking-[0.45em]" name="pin" inputmode="numeric" maxlength="4" [ngModel]="pin()" (ngModelChange)="pin.set($event)" placeholder="0000" />
+          <button class="btn btn-primary w-full" type="submit" [disabled]="loading()">
+            {{ loading() ? 'Verification...' : 'Regarder' }}
+          </button>
+        </div>
+      </form>
+    } @else {
+      <div class="overflow-hidden rounded-lg border border-white/10 bg-black shadow-2xl shadow-black/40">
+        <video
+          #videoPlayer
+          class="aspect-video w-full bg-black"
+          controls
+          playsinline
+          crossorigin="anonymous"
+          (play)="sendSync('play', true)"
+          (pause)="sendSync('pause', true)"
+          (seeked)="sendSync('seek', true)"
+          (timeupdate)="sendSync('time')"
+        >
+          <source [src]="room()!.videoUrl" [type]="room()!.videoContentType" />
+          @if (room()!.subtitleUrl) {
+            <track kind="subtitles" label="Francais" srclang="fr" [src]="room()!.subtitleUrl!" default />
+          }
+        </video>
+      </div>
+
+      <div class="grid gap-4 md:grid-cols-3">
+        <div class="rounded-lg border border-white/10 bg-base-100 p-4">
+          <p class="text-sm text-base-content/60">Code salon</p>
+          <p class="font-mono text-lg font-bold">{{ shareCode }}</p>
+        </div>
+        <div class="rounded-lg border border-white/10 bg-base-100 p-4">
+          <p class="text-sm text-base-content/60">Sous-titres</p>
+          <p class="font-semibold">{{ room()!.subtitleUrl ? 'Disponibles dans le lecteur' : 'Aucun fichier VTT' }}</p>
+        </div>
+        <div class="rounded-lg border border-white/10 bg-base-100 p-4">
+          <p class="text-sm text-base-content/60">Synchro</p>
+          <p class="font-semibold">Play, pause et seek partages</p>
+        </div>
+      </div>
+    }
+  </div>
+</section>

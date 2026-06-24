@@ -1,41 +1,36 @@
 services:
   postgres:
     image: postgres:16
-    container_name: boilerplate-postgres
+    container_name: 2daymovie-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: boilerplate_db
+      POSTGRES_DB: 2daymovie_db
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d boilerplate_db"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d 2daymovie_db"]
       interval: 10s
       timeout: 5s
       retries: 10
 
   minio:
     image: quay.io/minio/minio:RELEASE.2025-06-13T11-33-47Z
-    container_name: boilerplate-minio
+    container_name: 2daymovie-minio
     restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
-      MINIO_API_CORS_ALLOW_ORIGIN: http://localhost:4200
-    ports:
-      - "9000:9000"
-      - "9001:9001"
+      MINIO_API_CORS_ALLOW_ORIGIN: https://2daymovie.laurent-chen.fr
     volumes:
       - minio_data:/data
 
   backend:
     build:
       context: ./backend
-    container_name: boilerplate-backend
+    container_name: 2daymovie-backend
     restart: unless-stopped
     depends_on:
       postgres:
@@ -44,46 +39,29 @@ services:
         condition: service_started
     environment:
       SPRING_PROFILES_ACTIVE: prod
-      DB_URL: jdbc:postgresql://postgres:5432/boilerplate_db
+      DB_URL: jdbc:postgresql://postgres:5432/2daymovie_db
       DB_USERNAME: postgres
       DB_PASSWORD: postgres
-      CORS_ALLOWED_ORIGIN: http://localhost:4200
-      FRONTEND_BASE_URL: http://localhost:4200
-      JWT_SECRET: 6d8f5b72d2f64f64bca92be8b20ee6aa9fb6a8593d860f72cb1e9d1abf34b821
-      JWT_ACCESS_TOKEN_EXPIRATION_MINUTES: 15
-      JWT_REFRESH_TOKEN_EXPIRATION_DAYS: 7
-      MAIL_ENABLED: true
-      MAIL_FROM: no-reply@boilerplate.local
-      MAIL_HOST: mailpit
-      MAIL_PORT: 1025
-      MAIL_DEV_INBOX_ENABLED: true
+      CORS_ALLOWED_ORIGIN: https://2daymovie.laurent-chen.fr
+      FRONTEND_BASE_URL: https://2daymovie.laurent-chen.fr
       STORAGE_ENDPOINT: http://minio:9000
-      STORAGE_PUBLIC_ENDPOINT: http://localhost:9000
+      STORAGE_PUBLIC_ENDPOINT: http://minio:9000
+      STORAGE_PUBLIC_URL_BASE: https://2daymovie.laurent-chen.fr/minio
       STORAGE_ACCESS_KEY: minioadmin
       STORAGE_SECRET_KEY: minioadmin
-      STORAGE_BUCKET: boilerplate-files
+      STORAGE_BUCKET: 2daymovie-videos
       STORAGE_PRESIGNED_EXPIRY_MINUTES: 15
-      STORAGE_MAX_FILE_SIZE_BYTES: 20971520
-    ports:
-      - "8080:8080"
-
-  mailpit:
-    image: axllent/mailpit:v1.27
-    container_name: boilerplate-mailpit
-    restart: unless-stopped
-    ports:
-      - "1025:1025"
-      - "8025:8025"
+      STORAGE_MAX_FILE_SIZE_BYTES: 5368709120
 
   frontend:
     build:
       context: ./frontend
-    container_name: boilerplate-frontend
+    container_name: 2daymovie-frontend
     restart: unless-stopped
     depends_on:
       - backend
     ports:
-      - "4200:80"
+      - "127.0.0.1:9020:80"
 
 volumes:
   postgres_data:

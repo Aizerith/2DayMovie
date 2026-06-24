@@ -1,68 +1,79 @@
-<section class="px-4 py-10">
-  <div class="mx-auto grid w-full max-w-6xl gap-8 lg:grid-cols-[minmax(0,1fr)_24rem] lg:items-start">
-    <app-page-intro
-      class="w-full"
-      [badge]="'home.badge' | transloco"
-      badgeClass="badge badge-primary badge-outline"
-      [title]="'home.title' | transloco"
-      [description]="'home.description' | transloco"
-    >
-      <div class="flex flex-wrap gap-3">
-        <a routerLink="/login" class="btn btn-primary">{{ 'home.login' | transloco }}</a>
-        <a routerLink="/profile" class="btn btn-secondary">{{ 'home.protectedArea' | transloco }}</a>
-        <button type="button" class="btn btn-outline" (click)="testCall()">{{ 'home.testHealth' | transloco }}</button>
+<section class="px-4 py-10 md:py-16">
+  <div class="mx-auto w-full max-w-3xl">
+    <form class="rounded-lg border border-white/10 bg-base-100/95 p-6 shadow-2xl shadow-black/30 md:p-8" (ngSubmit)="createRoom()">
+      <div class="space-y-8">
+        <div class="space-y-2">
+          <p class="text-sm font-semibold uppercase tracking-[0.22em] text-accent">Watch party privee</p>
+          <h1 class="text-3xl font-black tracking-normal md:text-4xl">Creer un salon video</h1>
+          <p class="text-base text-base-content/65">Ajoute une video, un fichier VTT si besoin, puis partage le lien et le PIN genere.</p>
+        </div>
+
+        @if (createdRoom(); as room) {
+          <div class="rounded-lg border border-success/30 bg-success/10 p-5">
+            <div class="grid gap-4 md:grid-cols-[1fr_auto] md:items-center">
+              <div class="space-y-3">
+                <div>
+                  <p class="text-sm font-semibold text-success">Salon pret</p>
+                  <p class="break-all font-mono text-sm text-base-content/80">{{ shareLink() }}</p>
+                </div>
+                <div class="inline-flex items-center gap-3 rounded-lg border border-white/10 bg-base-200 px-4 py-3">
+                  <span class="text-sm text-base-content/60">PIN</span>
+                  <span class="font-mono text-2xl font-black tracking-[0.35em]">{{ generatedPin() }}</span>
+                </div>
+              </div>
+              <div class="flex gap-2">
+                <button type="button" class="btn btn-success btn-sm" (click)="copyLink()">Copier</button>
+                <a class="btn btn-primary btn-sm" [routerLink]="['/watch', room.shareCode]">Ouvrir</a>
+              </div>
+            </div>
+          </div>
+        }
+
+        <div class="grid gap-6">
+          <label class="grid gap-2">
+            <span class="text-sm font-semibold text-base-content/80">Titre</span>
+            <input class="input input-bordered h-12 w-full bg-base-200/70" name="title" [ngModel]="title()" (ngModelChange)="title.set($event)" placeholder="Soiree cinema" />
+          </label>
+
+          <div class="grid gap-3">
+            <div>
+              <p class="text-sm font-semibold text-base-content/80">Video</p>
+              <p class="text-xs text-base-content/50">Formats video supportes par le navigateur.</p>
+            </div>
+            <label class="flex min-h-28 cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-white/20 bg-base-200/60 px-4 py-5 text-center transition hover:border-primary/70 hover:bg-base-200">
+              <input class="sr-only" type="file" accept="video/*" (change)="selectVideo($event)" />
+              <span class="btn btn-outline btn-sm pointer-events-none">Choisir une video</span>
+              <span class="max-w-full truncate text-sm text-base-content/60">{{ videoFile()?.name || 'Aucun fichier selectionne' }}</span>
+            </label>
+          </div>
+
+          <div class="grid gap-3">
+            <div>
+              <p class="text-sm font-semibold text-base-content/80">Sous-titres</p>
+              <p class="text-xs text-base-content/50">Optionnel, uniquement en .vtt.</p>
+            </div>
+            <label class="flex min-h-24 cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-white/20 bg-base-200/60 px-4 py-5 text-center transition hover:border-secondary/70 hover:bg-base-200">
+              <input class="sr-only" type="file" accept=".vtt,text/vtt" (change)="selectSubtitle($event)" />
+              <span class="btn btn-outline btn-sm pointer-events-none">Choisir un VTT</span>
+              <span class="max-w-full truncate text-sm text-base-content/60">{{ subtitleFile()?.name || 'Aucun sous-titre selectionne' }}</span>
+            </label>
+          </div>
+        </div>
+
+        @if (creating()) {
+          <div class="space-y-2">
+            <div class="flex items-center justify-between text-sm text-base-content/60">
+              <span>Upload en cours</span>
+              <span>{{ uploadProgress() }}%</span>
+            </div>
+            <progress class="progress progress-primary w-full" [value]="uploadProgress()" max="100"></progress>
+          </div>
+        }
+
+        <button class="btn btn-primary min-h-12 w-full text-base font-bold" type="submit" [disabled]="creating()">
+          {{ creating() ? 'Creation du salon...' : 'Creer le lien partage' }}
+        </button>
       </div>
-
-      @if (currentUser(); as user) {
-        <app-notice-banner class="max-w-xl" tone="success" [message]="'home.localSession' | transloco: { email: user.email, role: user.role }"/>
-        <div class="flex flex-wrap gap-3">
-          <a routerLink="/profile" class="btn btn-ghost btn-sm">{{ 'home.backToPrivate' | transloco }}</a>
-        </div>
-      }
-
-      @if (message()) {
-        <app-notice-banner class="max-w-xl" tone="info" [message]="'common.backendResponse' | transloco: { value: message() }"/>
-      }
-
-      @if (!currentUser()) {
-        <app-empty-state
-          class="max-w-xl"
-          [title]="'home.noSessionTitle' | transloco"
-          [description]="'home.noSessionDescription' | transloco"
-          [actionLabel]="'login.submit' | transloco"
-          actionLink="/login"
-        />
-      }
-    </app-page-intro>
-
-    <app-stat-panel
-      class="w-full"
-      [title]="'home.demoTitle' | transloco"
-      [subtitle]="'home.demoSubtitle' | transloco"
-      [items]="demoCredentials()"
-      [vertical]="true"
-    >
-      <app-section-card [title]="'home.flowTitle' | transloco" [subtitle]="'home.flowSubtitle' | transloco">
-        <div class="flex flex-wrap gap-2">
-          <div class="badge badge-primary badge-outline">JWT</div>
-          <div class="badge badge-secondary badge-outline">{{ 'profile.refreshToken' | transloco }}</div>
-          <div class="badge badge-accent badge-outline">DaisyUI</div>
-        </div>
-      </app-section-card>
-    </app-stat-panel>
-  </div>
-
-  <div class="mx-auto mt-10 w-full max-w-6xl">
-    <app-section-card
-      [title]="'home.foundationsTitle' | transloco"
-      [subtitle]="'home.foundationsSubtitle' | transloco"
-    >
-      <app-data-list
-        [title]="'home.frontBaseTitle' | transloco"
-        [subtitle]="'home.frontBaseSubtitle' | transloco"
-        [columns]="foundationColumns()"
-        [rows]="foundationRows()"
-      />
-    </app-section-card>
+    </form>
   </div>
 </section>
