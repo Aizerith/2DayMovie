@@ -51,7 +51,7 @@ services:
       STORAGE_SECRET_KEY: minioadmin
       STORAGE_BUCKET: 2daymovie-videos
       STORAGE_PRESIGNED_EXPIRY_MINUTES: 15
-      STORAGE_MAX_FILE_SIZE_BYTES: 5368709120
+      STORAGE_MAX_FILE_SIZE_BYTES: 21474836480
 
   frontend:
     build:

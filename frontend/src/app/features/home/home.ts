@@ -1,4 +1,4 @@
-import {HttpClient, HttpEventType} from '@angular/common/http';
+import {HttpClient, HttpErrorResponse, HttpEventType} from '@angular/common/http';
 import {Component, computed, inject, signal} from '@angular/core';
 import {FormsModule} from '@angular/forms';
 import {RouterLink} from '@angular/router';
@@ -73,7 +73,7 @@ export class Home {
       )),
       finalize(() => this.creating.set(false))
     ).subscribe({
-      error: () => this.notificationService.error('Impossible de creer le salon pour le moment.')
+      error: error => this.notificationService.error(this.errorMessage(error))
     });
   }
 
@@ -135,5 +135,23 @@ export class Home {
 
   private generatePin(): string {
     return Math.floor(1000 + Math.random() * 9000).toString();
+  }
+
+  private errorMessage(error: unknown): string {
+    if (error instanceof HttpErrorResponse) {
+      if (typeof error.error?.message === 'string') {
+        return error.error.message;
+      }
+
+      if (error.status === 0) {
+        return 'Upload impossible: verifie la connexion au serveur ou la configuration proxy/MinIO.';
+      }
+
+      if (error.status === 413) {
+        return 'La video est trop volumineuse pour la configuration actuelle du proxy.';
+      }
+    }
+
+    return 'Impossible de creer le salon pour le moment.';
   }
 }

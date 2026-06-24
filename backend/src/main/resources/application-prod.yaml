@@ -39,4 +39,4 @@ app:
     bucket: ${STORAGE_BUCKET:2daymovie-videos}
     public-url-base: ${STORAGE_PUBLIC_URL_BASE:}
     presigned-expiry-minutes: ${STORAGE_PRESIGNED_EXPIRY_MINUTES:15}
-    max-file-size-bytes: ${STORAGE_MAX_FILE_SIZE_BYTES:5368709120}
+    max-file-size-bytes: ${STORAGE_MAX_FILE_SIZE_BYTES:21474836480}
