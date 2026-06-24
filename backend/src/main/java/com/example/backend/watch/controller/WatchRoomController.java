@@ -44,4 +44,13 @@ public class WatchRoomController {
     ) {
         return watchRoomService.access(shareCode, request);
     }
+
+    @PostMapping("/{shareCode}/close")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void close(
+            @PathVariable String shareCode,
+            @Valid @RequestBody AccessWatchRoomRequest request
+    ) {
+        watchRoomService.close(shareCode, request);
+    }
 }

@@ -27,4 +27,8 @@ export class WatchRoomService {
   accessRoom(shareCode: string, pin: string) {
     return this.http.post<WatchRoomAccessResponse>(`${this.apiUrl}/${shareCode}/access`, {pin});
   }
+
+  closeRoom(shareCode: string, pin: string) {
+    return this.http.post<void>(`${this.apiUrl}/${shareCode}/close`, {pin});
+  }
 }

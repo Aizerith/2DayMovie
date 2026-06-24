@@ -77,6 +77,9 @@ test.describe('watch party', () => {
         status: 200
       });
     });
+    await page.route(`**/api/rooms/${room.shareCode}/close`, async route => {
+      await route.fulfill({body: '', status: 204});
+    });
 
     await page.goto(`/watch/${room.shareCode}`);
     await page.getByPlaceholder('0000').fill('1234');
@@ -85,5 +88,9 @@ test.describe('watch party', () => {
     await expect(page.getByRole('heading', {name: 'Movie night'})).toBeVisible();
     await expect(page.getByText('Reglage de l')).toBeVisible();
     await expect(page.locator('video')).toBeVisible();
+    await page.getByRole('button', {name: 'Clore le salon'}).click();
+    await expect(page.getByRole('heading', {name: 'Clore le salon ?'})).toBeVisible();
+    await page.getByRole('button', {name: 'Confirmer la fermeture'}).click();
+    await expect(page).toHaveURL(/\/$/);
   });
 });

@@ -1,6 +1,6 @@
 import {Component, ElementRef, OnDestroy, ViewChild, inject, signal} from '@angular/core';
 import {FormsModule} from '@angular/forms';
-import {ActivatedRoute, RouterLink} from '@angular/router';
+import {ActivatedRoute, Router, RouterLink} from '@angular/router';
 import {Client, StompSubscription} from '@stomp/stompjs';
 import {environment} from '../../../environments/environment';
 import {PlaybackSyncMessage, WatchRoomAccessResponse} from '../../core/models/watch-room.model';
@@ -17,6 +17,7 @@ import {WatchRoomService} from '../../core/services/watch-room.service';
 })
 export class Watch implements OnDestroy {
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly watchRoomService = inject(WatchRoomService);
   private readonly notificationService = inject(NotificationService);
   private readonly clientId = crypto.randomUUID();
@@ -34,6 +35,8 @@ export class Watch implements OnDestroy {
   readonly connected = signal(false);
   readonly subtitleSize = signal(100);
   readonly subtitleBackground = signal<'soft' | 'solid' | 'none'>('soft');
+  readonly closeConfirmationOpen = signal(false);
+  readonly closing = signal(false);
 
   unlock(): void {
     const pin = this.pin().trim();
@@ -98,6 +101,34 @@ export class Watch implements OnDestroy {
       default:
         return 'rgba(0, 0, 0, 0.42)';
     }
+  }
+
+  askCloseRoom(): void {
+    this.closeConfirmationOpen.set(true);
+  }
+
+  cancelCloseRoom(): void {
+    if (!this.closing()) {
+      this.closeConfirmationOpen.set(false);
+    }
+  }
+
+  closeRoom(): void {
+    if (this.closing()) {
+      return;
+    }
+
+    this.closing.set(true);
+    this.watchRoomService.closeRoom(this.shareCode, this.pin()).subscribe({
+      next: () => {
+        this.notificationService.success('Salon cloture et fichiers supprimes.');
+        void this.router.navigateByUrl('/');
+      },
+      error: () => {
+        this.closing.set(false);
+        this.notificationService.error('Impossible de cloturer le salon pour le moment.');
+      }
+    });
   }
 
   ngOnDestroy(): void {

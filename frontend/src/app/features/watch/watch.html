@@ -84,10 +84,36 @@
           <p class="font-semibold">{{ room()!.subtitleTracks.length }} piste(s) disponible(s)</p>
         </div>
         <div class="rounded-lg border border-white/10 bg-base-100 p-4">
-          <p class="text-sm text-base-content/60">Synchro</p>
-          <p class="font-semibold">Play, pause et seek partages</p>
+          <p class="text-sm text-base-content/60">Fin de visionnage</p>
+          <button class="btn btn-error btn-sm mt-3 w-full" type="button" (click)="askCloseRoom()">
+            Clore le salon
+          </button>
         </div>
       </div>
+
+      @if (closeConfirmationOpen()) {
+        <div class="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4 backdrop-blur-sm">
+          <div class="w-full max-w-md rounded-lg border border-error/30 bg-base-100 p-5 shadow-2xl">
+            <div class="space-y-4">
+              <div>
+                <h2 class="text-xl font-black">Clore le salon ?</h2>
+                <p class="mt-2 text-sm text-base-content/65">
+                  Cette action supprime la video, les sous-titres et le lien de partage. Les personnes connectees ne pourront plus acceder au salon.
+                </p>
+              </div>
+
+              <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <button class="btn btn-ghost" type="button" [disabled]="closing()" (click)="cancelCloseRoom()">
+                  Annuler
+                </button>
+                <button class="btn btn-error" type="button" [disabled]="closing()" (click)="closeRoom()">
+                  {{ closing() ? 'Suppression...' : 'Confirmer la fermeture' }}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      }
     }
   </div>
 </section>

@@ -24,6 +24,7 @@ import io.minio.GetPresignedObjectUrlArgs;
 import io.minio.MakeBucketArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
+import io.minio.RemoveObjectArgs;
 import io.minio.StatObjectArgs;
 import io.minio.StatObjectResponse;
 import io.minio.errors.ErrorResponseException;
@@ -37,9 +38,11 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
@@ -134,6 +137,26 @@ public class WatchRoomService {
             throw new IllegalArgumentException("La video n est pas encore prete");
         }
         return toAccessResponse(room);
+    }
+
+    @Transactional
+    public void close(String shareCode, AccessWatchRoomRequest request) {
+        WatchRoom room = findAndVerifyPin(shareCode, request.pin());
+        Set<String> objectKeys = new LinkedHashSet<>();
+
+        objectKeys.add(room.getVideoObjectKey());
+        if (StringUtils.hasText(room.getSubtitleObjectKey())) {
+            objectKeys.add(room.getSubtitleObjectKey());
+        }
+
+        subtitleTrackRepository.findAllByRoomOrderByDisplayOrderAsc(room)
+                .forEach(track -> objectKeys.add(track.getObjectKey()));
+
+        for (String objectKey : objectKeys) {
+            deleteObjectIfPresent(objectKey);
+        }
+
+        watchRoomRepository.delete(room);
     }
 
     @Transactional
@@ -327,6 +350,28 @@ public class WatchRoomService {
                             .stream(inputStream, Files.size(subtitlePath), -1)
                             .build()
             );
+        }
+    }
+
+    private void deleteObjectIfPresent(String objectKey) {
+        if (!StringUtils.hasText(objectKey)) {
+            return;
+        }
+
+        try {
+            internalMinioClient.removeObject(
+                    RemoveObjectArgs.builder()
+                            .bucket(appProperties.getStorage().getBucket())
+                            .object(objectKey)
+                            .build()
+            );
+        } catch (ErrorResponseException exception) {
+            String code = exception.errorResponse().code();
+            if (!"NoSuchKey".equals(code) && !"NoSuchBucket".equals(code)) {
+                throw new IllegalStateException("Failed to delete a room file", exception);
+            }
+        } catch (Exception exception) {
+            throw new IllegalStateException("Failed to delete a room file", exception);
         }
     }
 
