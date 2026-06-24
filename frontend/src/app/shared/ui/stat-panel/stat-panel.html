@@ -1,0 +1,32 @@
+<div class="card bg-base-100 shadow-xl">
+  <div class="card-body gap-4">
+    <div class="space-y-1">
+      <h2 class="card-title">{{ title() }}</h2>
+      @if (subtitle()) {
+        <p class="text-sm text-base-content/70">{{ subtitle() }}</p>
+      }
+    </div>
+
+    @if (vertical()) {
+      <div class="stats stats-vertical border border-base-300">
+        @for (item of items(); track item.label) {
+          <div class="stat">
+            <div class="stat-title">{{ item.label }}</div>
+            <div class="stat-value text-lg">{{ item.value }}</div>
+          </div>
+        }
+      </div>
+    } @else {
+      <div class="stats stats-vertical border border-base-300 lg:stats-horizontal">
+        @for (item of items(); track item.label) {
+          <div class="stat">
+            <div class="stat-title">{{ item.label }}</div>
+            <div class="stat-value text-lg">{{ item.value }}</div>
+          </div>
+        }
+      </div>
+    }
+
+    <ng-content />
+  </div>
+</div>

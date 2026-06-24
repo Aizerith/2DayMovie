@@ -1,0 +1,87 @@
+<div class="card bg-base-100 shadow-xl">
+  <div class="card-body gap-4">
+    <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <div class="space-y-1">
+        <h2 class="card-title">{{ title() }}</h2>
+        @if (subtitle()) {
+          <p class="text-sm text-base-content/70">{{ subtitle() }}</p>
+        }
+      </div>
+
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+        @if (searchable()) {
+          <label class="input input-bordered flex min-w-64 items-center gap-2">
+            <span class="text-base-content/50">⌕</span>
+            <input
+              class="grow"
+              type="text"
+              [value]="searchQuery()"
+              [placeholder]="searchPlaceholder() || ('dataList.searchPlaceholder' | transloco)"
+              (input)="updateSearchQuery(($any($event.target).value))"
+            >
+          </label>
+        }
+
+        <label class="select select-bordered min-w-24">
+          <select [attr.aria-label]="'dataList.pageSizeAria' | transloco" [value]="pageSize()" (change)="updatePageSize(($any($event.target).value))">
+            @for (size of pageSizeOptions(); track size) {
+              <option [value]="size">{{ size }}</option>
+            }
+          </select>
+        </label>
+      </div>
+    </div>
+
+    <div class="overflow-x-auto rounded-box border border-base-300">
+      <table class="table">
+        <thead>
+        <tr>
+          @for (column of columns(); track column.key) {
+            <th>
+              @if (isColumnSortable(column)) {
+                <button class="btn btn-ghost btn-xs -ml-2 gap-1 px-2 font-semibold normal-case" type="button" (click)="toggleSort(column)">
+                  {{ column.label }}
+                  <span class="text-xs text-base-content/50">{{ sortIndicator(column) }}</span>
+                </button>
+              } @else {
+                {{ column.label }}
+              }
+            </th>
+          }
+        </tr>
+        </thead>
+        <tbody>
+          @for (row of paginatedRows(); track rowTrackKey(row, $index)) {
+            <tr
+              [class.cursor-pointer]="selectable()"
+              [class.bg-base-200]="selectable() && row[keyField()] === selectedKey()"
+              (click)="selectable() ? rowSelected.emit(row) : null"
+            >
+              @for (column of columns(); track column.key) {
+                <td>{{ row[column.key] }}</td>
+              }
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <div class="flex flex-col gap-3 border-t border-base-300 pt-4 text-sm text-base-content/70 sm:flex-row sm:items-center sm:justify-between">
+      <p>
+        @if (displayedTotal()) {
+          {{ 'dataList.range' | transloco: { start: startItem(), end: endItem(), total: displayedTotal() } }}
+        } @else {
+          {{ 'dataList.zeroResults' | transloco }}
+        }
+      </p>
+
+      <div class="join">
+        <button class="join-item btn btn-sm btn-outline" type="button" [disabled]="displayedPage() === 1" (click)="previousPage()">{{ 'dataList.previous' | transloco }}</button>
+        <button class="join-item btn btn-sm btn-ghost pointer-events-none" type="button">{{ 'dataList.pageOf' | transloco: { page: displayedPage(), total: totalPages() } }}</button>
+        <button class="join-item btn btn-sm btn-outline" type="button" [disabled]="displayedPage() >= totalPages()" (click)="nextPage()">{{ 'dataList.next' | transloco }}</button>
+      </div>
+    </div>
+
+    <ng-content />
+  </div>
+</div>

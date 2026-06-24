@@ -1,0 +1,125 @@
+<section class="min-h-full px-4 py-10">
+  <div class="mx-auto flex max-w-6xl flex-col gap-6">
+    <app-page-intro
+      [badge]="'projects.badge' | transloco"
+      badgeClass="badge badge-secondary badge-outline"
+      [title]="'projects.title' | transloco"
+      [description]="'projects.description' | transloco"
+      [compact]="true"
+    />
+
+    <app-toolbar
+      [title]="'projects.toolbarTitle' | transloco"
+      [subtitle]="isAdmin() ? ('projects.toolbarSubtitleAdmin' | transloco) : ('projects.toolbarSubtitleUser' | transloco)"
+    >
+      <button class="btn btn-primary" data-testid="projects-start-create" type="button" (click)="startCreate()">{{ 'projects.new' | transloco }}</button>
+      <button class="btn btn-outline" type="button" (click)="loadProjects()">{{ 'common.refresh' | transloco }}</button>
+      <button class="btn btn-outline btn-error" type="button" [disabled]="!selectedProject" (click)="askDelete()">{{ 'common.delete' | transloco }}</button>
+    </app-toolbar>
+
+    @if (infoMessage()) {
+      <app-notice-banner tone="success" [message]="infoMessage()" />
+    }
+
+    @if (errorMessage()) {
+      <app-notice-banner tone="error" [message]="errorMessage()" />
+    }
+
+    <div class="grid gap-6 xl:grid-cols-[minmax(0,1.5fr)_minmax(24rem,1fr)]">
+      <div class="space-y-6">
+        @if (projects().length) {
+          <app-data-list
+            [title]="'projects.listTitle' | transloco"
+            [subtitle]="'projects.listSubtitle' | transloco"
+            [columns]="columns()"
+            [rows]="rows"
+            [selectable]="true"
+            [serverSide]="true"
+            [totalItems]="totalItems()"
+            [currentPageIndex]="page()"
+            [initialPageSize]="pageSize()"
+            [searchable]="false"
+            keyField="id"
+            [selectedKey]="selectedRowKey"
+            [searchPlaceholder]="'projects.searchPlaceholder' | transloco"
+            (rowSelected)="selectRow($event)"
+            (pageChanged)="updatePage($event)"
+            (pageSizeChanged)="updatePageSize($event)"
+            (sortChanged)="updateSort($event)"
+          />
+        } @else if (!loading()) {
+          <app-empty-state
+            [title]="'projects.emptyTitle' | transloco"
+            [description]="'projects.emptyDescription' | transloco"
+            [actionLabel]="'projects.emptyAction' | transloco"
+            actionLink="/projects"
+          />
+        }
+      </div>
+
+      <app-section-card
+        [title]="selectedProject ? ('projects.updateTitle' | transloco) : ('projects.createTitle' | transloco)"
+        [subtitle]="selectedProject ? ('projects.updateSubtitle' | transloco) : ('projects.createSubtitle' | transloco)"
+      >
+        <form class="space-y-7" [formGroup]="form" (ngSubmit)="submit()">
+          <app-form-field [label]="'projects.nameLabel' | transloco" [required]="true" [error]="fieldError('name')">
+            <input class="input input-bordered w-full" data-testid="project-name" type="text" formControlName="name" [placeholder]="'projects.placeholders.name' | transloco">
+          </app-form-field>
+
+          <app-form-field
+            [label]="'projects.descriptionLabel' | transloco"
+            [required]="true"
+            [error]="fieldError('description')"
+            [hint]="'projects.descriptionHint' | transloco"
+          >
+            <textarea class="textarea textarea-bordered min-h-32 w-full" data-testid="project-description" formControlName="description" [placeholder]="'projects.placeholders.description' | transloco"></textarea>
+          </app-form-field>
+
+          <app-form-field [label]="'projects.statusLabel' | transloco" [required]="true" [error]="fieldError('status')">
+            <select class="select select-bordered w-full" data-testid="project-status" formControlName="status">
+              @for (status of statusOptions; track status) {
+                <option [value]="status">{{ statusLabel(status) }}</option>
+              }
+            </select>
+          </app-form-field>
+
+          @if (selectedProject) {
+            <div class="rounded-box border border-base-300 bg-base-200/50 px-4 py-4">
+              <div class="space-y-1">
+                <p class="text-sm font-semibold text-base-content/70">{{ 'projects.ownerLabel' | transloco }}</p>
+                <p class="font-medium">{{ selectedProject.ownerName }}</p>
+                <p class="text-sm text-base-content/60">{{ selectedProject.ownerEmail }}</p>
+              </div>
+            </div>
+          } @else if (currentUser(); as user) {
+            <div class="rounded-box border border-base-300 bg-base-200/50 px-4 py-4">
+              <div class="space-y-1">
+                <p class="text-sm font-semibold text-base-content/70">{{ 'projects.ownerLabel' | transloco }}</p>
+                <p class="font-medium">{{ user.firstName }} {{ user.lastName }}</p>
+                <p class="text-sm text-base-content/60">{{ user.email }}</p>
+              </div>
+            </div>
+          }
+
+          <app-form-actions
+            [submitLabel]="selectedProject ? ('common.update' | transloco) : ('projects.new' | transloco)"
+            submitTestId="project-submit"
+            [submitting]="saving()"
+            (cancelled)="resetForm()"
+          />
+        </form>
+      </app-section-card>
+    </div>
+  </div>
+
+  <app-modal-confirm
+    [open]="deleteModalOpen()"
+    [title]="'projects.deleteTitle' | transloco"
+    [message]="selectedProject ? ('projects.deleteMessage' | transloco: { name: selectedProject.name }) : ('projects.noSelection' | transloco)"
+    [confirmLabel]="'common.delete' | transloco"
+    [cancelLabel]="'common.cancel' | transloco"
+    tone="error"
+    (confirmed)="confirmDelete()"
+    (cancelled)="cancelDelete()"
+  />
+</section>

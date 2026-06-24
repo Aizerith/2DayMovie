@@ -1,0 +1,150 @@
+<section class="min-h-full px-4 py-10">
+  <div class="mx-auto flex max-w-6xl flex-col gap-6">
+    <app-page-intro
+      [badge]="'tasks.badge' | transloco"
+      badgeClass="badge badge-accent badge-outline"
+      [title]="'tasks.title' | transloco"
+      [description]="'tasks.description' | transloco"
+      [compact]="true"
+    />
+
+    <app-toolbar
+      [title]="'tasks.toolbarTitle' | transloco"
+      [subtitle]="'tasks.toolbarSubtitle' | transloco"
+    >
+      <label class="select select-bordered">
+        <select data-testid="tasks-project-filter" [value]="selectedProjectFilter() ?? 0" (change)="updateProjectFilter(($any($event.target).value))">
+          <option [value]="0">{{ 'tasks.allProjects' | transloco }}</option>
+          @for (project of projects(); track project.id) {
+            <option [value]="project.id">{{ project.name }}</option>
+          }
+        </select>
+      </label>
+
+      <button class="btn btn-primary" data-testid="tasks-start-create" type="button" (click)="startCreate()">{{ 'tasks.new' | transloco }}</button>
+      <button class="btn btn-outline" type="button" (click)="loadTasks()">{{ 'common.refresh' | transloco }}</button>
+      <button class="btn btn-outline btn-error" type="button" [disabled]="!selectedTask || selectedTaskLocked" (click)="askDelete()">{{ 'common.delete' | transloco }}</button>
+    </app-toolbar>
+
+    @if (infoMessage()) {
+      <app-notice-banner tone="success" [message]="infoMessage()" />
+    }
+
+    @if (errorMessage()) {
+      <app-notice-banner tone="error" [message]="errorMessage()" />
+    }
+
+    <div class="grid gap-6 xl:grid-cols-[minmax(0,1.5fr)_minmax(24rem,1fr)]">
+      <div class="space-y-6">
+        @if (tasks().length) {
+          <app-data-list
+            [title]="'tasks.listTitle' | transloco"
+            [subtitle]="'tasks.listSubtitle' | transloco"
+            [columns]="columns()"
+            [rows]="rows"
+            [selectable]="true"
+            [serverSide]="true"
+            [totalItems]="totalItems()"
+            [currentPageIndex]="page()"
+            [initialPageSize]="pageSize()"
+            [searchable]="false"
+            keyField="id"
+            [selectedKey]="selectedRowKey"
+            [searchPlaceholder]="'tasks.searchPlaceholder' | transloco"
+            defaultSortKey="dueDate"
+            (rowSelected)="selectRow($event)"
+            (pageChanged)="updatePage($event)"
+            (pageSizeChanged)="updatePageSize($event)"
+            (sortChanged)="updateSort($event)"
+          />
+        } @else if (!loading()) {
+          <app-empty-state
+            [title]="'tasks.emptyTitle' | transloco"
+            [description]="'tasks.emptyDescription' | transloco"
+            [actionLabel]="'tasks.emptyAction' | transloco"
+            actionLink="/projects"
+          />
+        }
+      </div>
+
+      <app-section-card
+        [title]="selectedTask ? ('tasks.updateTitle' | transloco) : ('tasks.createTitle' | transloco)"
+        [subtitle]="selectedTask ? (selectedTaskLocked ? ('tasks.lockedSubtitle' | transloco) : ('tasks.updateSubtitle' | transloco)) : ('tasks.createSubtitle' | transloco)"
+      >
+        <form class="space-y-7" [formGroup]="form" (ngSubmit)="submit()">
+          <app-form-field [label]="'tasks.projectLabel' | transloco" [required]="true" [error]="fieldError('projectId')">
+            <select class="select select-bordered w-full" data-testid="task-project" formControlName="projectId" [disabled]="selectedTaskLocked">
+              <option [ngValue]="0">{{ 'tasks.selectProject' | transloco }}</option>
+              @for (project of availableProjectOptions(); track project.id) {
+                <option [ngValue]="project.id">{{ project.name }}</option>
+              }
+            </select>
+          </app-form-field>
+
+          <app-form-field [label]="'tasks.assigneeLabel' | transloco" [error]="fieldError('assigneeId')" [hint]="'tasks.assigneeHint' | transloco">
+            <select class="select select-bordered w-full" data-testid="task-assignee" formControlName="assigneeId" [disabled]="selectedTaskLocked">
+              <option [ngValue]="0">{{ 'tasks.noAssignee' | transloco }}</option>
+              @for (user of availableAssigneeOptions(); track user.id) {
+                <option [ngValue]="user.id">{{ user.name }}</option>
+              }
+            </select>
+          </app-form-field>
+
+          <app-form-field [label]="'tasks.titleLabel' | transloco" [required]="true" [error]="fieldError('title')">
+            <input class="input input-bordered w-full" data-testid="task-title" type="text" formControlName="title" [placeholder]="'tasks.placeholders.title' | transloco" [readonly]="selectedTaskLocked">
+          </app-form-field>
+
+          <app-form-field
+            [label]="'tasks.descriptionLabel' | transloco"
+            [required]="true"
+            [error]="fieldError('description')"
+            [hint]="'tasks.descriptionHint' | transloco"
+          >
+            <textarea class="textarea textarea-bordered min-h-32 w-full" data-testid="task-description" formControlName="description" [placeholder]="'tasks.placeholders.description' | transloco" [readonly]="selectedTaskLocked"></textarea>
+          </app-form-field>
+
+          <div class="grid gap-5 md:grid-cols-2">
+            <app-form-field [label]="'tasks.statusLabel' | transloco" [required]="true" [error]="fieldError('status')">
+              <select class="select select-bordered w-full" data-testid="task-status" formControlName="status" [disabled]="selectedTaskLocked">
+                @for (status of statusOptions; track status) {
+                  <option [value]="status">{{ statusLabel(status) }}</option>
+                }
+              </select>
+            </app-form-field>
+
+            <app-form-field [label]="'tasks.priorityLabel' | transloco" [required]="true" [error]="fieldError('priority')">
+              <select class="select select-bordered w-full" data-testid="task-priority" formControlName="priority" [disabled]="selectedTaskLocked">
+                @for (priority of priorityOptions; track priority) {
+                  <option [value]="priority">{{ priorityLabel(priority) }}</option>
+                }
+              </select>
+            </app-form-field>
+          </div>
+
+          <app-form-field [label]="'tasks.dueDateLabel' | transloco" [error]="fieldError('dueDate')">
+            <input class="input input-bordered w-full" data-testid="task-due-date" type="date" formControlName="dueDate" [readonly]="selectedTaskLocked">
+          </app-form-field>
+
+          <app-form-actions
+            [submitLabel]="selectedTask ? ('common.update' | transloco) : ('common.create' | transloco)"
+            submitTestId="task-submit"
+            [disabled]="selectedTaskLocked"
+            [submitting]="saving()"
+            (cancelled)="resetForm()"
+          />
+        </form>
+      </app-section-card>
+    </div>
+  </div>
+
+  <app-modal-confirm
+    [open]="deleteModalOpen()"
+    [title]="'tasks.deleteTitle' | transloco"
+    [message]="selectedTask ? ('tasks.deleteMessage' | transloco: { title: selectedTask.title }) : ('tasks.noSelection' | transloco)"
+    [confirmLabel]="'common.delete' | transloco"
+    [cancelLabel]="'common.cancel' | transloco"
+    tone="error"
+    (confirmed)="confirmDelete()"
+    (cancelled)="cancelDelete()"
+  />
+</section>

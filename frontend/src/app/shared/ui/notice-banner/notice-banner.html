@@ -1,0 +1,16 @@
+<div class="alert gap-3 rounded-2xl shadow-lg"
+     [class.alert-info]="tone() === 'info'" [class.alert-success]="tone() === 'success'"
+     [class.alert-warning]="tone() === 'warning'" [class.alert-error]="tone() === 'error'">
+  <span class="inline-flex size-6 items-center justify-center rounded-full bg-current/10 text-sm font-bold">
+    @if (tone() === 'success') {
+      <span>✓</span>
+    } @else if (tone() === 'warning') {
+      <span>!</span>
+    } @else if (tone() === 'error') {
+      <span>×</span>
+    } @else {
+      <span>i</span>
+    }
+  </span>
+  <span class="leading-6">{{ message() }}</span>
+</div>

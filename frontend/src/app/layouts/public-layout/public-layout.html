@@ -1,0 +1,22 @@
+<div [attr.data-theme]="theme()" class="min-h-screen bg-base-200 text-base-content">
+  <div class="navbar px-4">
+    <div class="mx-auto flex w-full max-w-6xl items-center justify-between">
+      <a routerLink="/" class="btn btn-ghost px-2 text-lg font-black tracking-tight">{{ 'common.appName' | transloco }}</a>
+
+      <div class="flex items-center gap-2">
+        <div class="join">
+          <button class="join-item btn btn-ghost btn-sm" type="button" [class.btn-active]="activeLang() === 'fr'" (click)="setLanguage('fr')">FR</button>
+          <button class="join-item btn btn-ghost btn-sm" type="button" [class.btn-active]="activeLang() === 'en'" (click)="setLanguage('en')">EN</button>
+        </div>
+
+        <button class="btn btn-ghost btn-sm" type="button" (click)="toggleTheme()">
+          {{ 'shell.theme' | transloco }}: {{ themeLabel() }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <main class="min-h-[calc(100vh-4rem)]">
+    <router-outlet />
+  </main>
+</div>

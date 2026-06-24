@@ -1,0 +1,124 @@
+<section class="min-h-full px-4 py-10">
+  <div class="mx-auto flex max-w-6xl flex-col gap-6">
+    <app-page-intro
+      [badge]="'users.badge' | transloco"
+      badgeClass="badge badge-primary badge-outline"
+      [title]="'users.title' | transloco"
+      [description]="'users.description' | transloco"
+      [compact]="true"
+    />
+
+    <app-toolbar [title]="'users.toolbarTitle' | transloco" [subtitle]="'users.toolbarSubtitle' | transloco">
+      <button class="btn btn-primary" type="button" (click)="startCreate()">{{ 'users.new' | transloco }}</button>
+      <button class="btn btn-outline" type="button" (click)="loadUsers()">{{ 'common.refresh' | transloco }}</button>
+      <button class="btn btn-outline btn-error" type="button" [disabled]="!selectedUser" (click)="askDelete()">{{ 'common.delete' | transloco }}</button>
+    </app-toolbar>
+
+    @if (infoMessage()) {
+      <app-notice-banner tone="success" [message]="infoMessage()" />
+    }
+
+    @if (errorMessage()) {
+      <app-notice-banner tone="error" [message]="errorMessage()" />
+    }
+
+    <div class="grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(22rem,1fr)]">
+      <div class="space-y-6">
+        @if (users().length) {
+          <app-data-list
+            [title]="'users.listTitle' | transloco"
+            [subtitle]="'users.listSubtitle' | transloco"
+            [columns]="columns()"
+            [rows]="rows"
+            [selectable]="true"
+            [serverSide]="true"
+            [totalItems]="totalItems()"
+            [currentPageIndex]="page()"
+            [initialPageSize]="pageSize()"
+            [searchable]="false"
+            keyField="id"
+            [selectedKey]="selectedRowKey"
+            [searchPlaceholder]="'users.searchPlaceholder' | transloco"
+            (rowSelected)="selectRow($event)"
+            (pageChanged)="updatePage($event)"
+            (pageSizeChanged)="updatePageSize($event)"
+            (sortChanged)="updateSort($event)"
+          />
+        } @else if (!loading()) {
+          <app-empty-state
+            [title]="'users.emptyTitle' | transloco"
+            [description]="'users.emptyDescription' | transloco"
+            [actionLabel]="'users.emptyAction' | transloco"
+            actionLink="/users"
+          />
+        }
+      </div>
+
+      <app-section-card
+        [title]="selectedUser ? ('users.updateTitle' | transloco) : ('users.createTitle' | transloco)"
+        [subtitle]="selectedUser ? ('users.updateSubtitle' | transloco) : ('users.createSubtitle' | transloco)"
+      >
+        <form class="space-y-7" [formGroup]="form" (ngSubmit)="submit()">
+          <app-form-field [label]="'common.email' | transloco" [required]="true" [error]="fieldError('email')">
+            <input class="input input-bordered w-full" type="email" formControlName="email" placeholder="utilisateur@demo.dev">
+          </app-form-field>
+
+          <app-form-field [label]="'users.fields.firstName' | transloco" [required]="true" [error]="fieldError('firstName')">
+            <input class="input input-bordered w-full" type="text" formControlName="firstName" placeholder="Jane">
+          </app-form-field>
+
+          <app-form-field [label]="'users.fields.lastName' | transloco" [required]="true" [error]="fieldError('lastName')">
+            <input class="input input-bordered w-full" type="text" formControlName="lastName" placeholder="Doe">
+          </app-form-field>
+
+          <app-form-field
+            [label]="'common.password' | transloco"
+            [required]="!selectedUser"
+            [error]="fieldError('password')"
+            [hint]="selectedUser ? ('users.fields.passwordHintUpdate' | transloco) : ('users.fields.passwordHintCreate' | transloco)"
+          >
+            <input class="input input-bordered w-full" type="password" formControlName="password" placeholder="Secret123!">
+          </app-form-field>
+
+          @if (selectedUser) {
+            <app-notice-banner
+              [tone]="selectedUser.emailVerified ? 'success' : 'warning'"
+              [message]="selectedUser.emailVerified ? ('users.verified.alreadyVerified' | transloco) : ('users.verified.pendingNotice' | transloco)"
+            />
+          }
+
+          <app-form-field [label]="'common.role' | transloco" [required]="true" [error]="fieldError('role')">
+            <select class="select select-bordered w-full" formControlName="role">
+              <option value="ADMIN">ADMIN</option>
+              <option value="MANAGER">MANAGER</option>
+              <option value="USER">USER</option>
+            </select>
+          </app-form-field>
+
+          <label class="label mt-1 cursor-pointer justify-start gap-3 rounded-box border border-base-300 px-4 py-4">
+            <input class="toggle toggle-primary" type="checkbox" formControlName="enabled">
+            <span class="label-text">{{ 'common.activeUser' | transloco }}</span>
+          </label>
+
+          <app-form-actions
+            [submitLabel]="selectedUser ? ('common.update' | transloco) : ('common.create' | transloco)"
+            submitTestId="user-submit"
+            [submitting]="saving()"
+            (cancelled)="resetForm()"
+          />
+        </form>
+      </app-section-card>
+    </div>
+  </div>
+
+  <app-modal-confirm
+    [open]="deleteModalOpen()"
+    [title]="'users.deleteTitle' | transloco"
+    [message]="selectedUser ? ('users.deleteMessage' | transloco: { email: selectedUser.email }) : ('users.noSelection' | transloco)"
+    [confirmLabel]="'common.delete' | transloco"
+    [cancelLabel]="'common.cancel' | transloco"
+    tone="error"
+    (confirmed)="confirmDelete()"
+    (cancelled)="cancelDelete()"
+  />
+</section>

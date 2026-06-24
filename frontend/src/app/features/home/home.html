@@ -1,0 +1,68 @@
+<section class="px-4 py-10">
+  <div class="mx-auto grid w-full max-w-6xl gap-8 lg:grid-cols-[minmax(0,1fr)_24rem] lg:items-start">
+    <app-page-intro
+      class="w-full"
+      [badge]="'home.badge' | transloco"
+      badgeClass="badge badge-primary badge-outline"
+      [title]="'home.title' | transloco"
+      [description]="'home.description' | transloco"
+    >
+      <div class="flex flex-wrap gap-3">
+        <a routerLink="/login" class="btn btn-primary">{{ 'home.login' | transloco }}</a>
+        <a routerLink="/profile" class="btn btn-secondary">{{ 'home.protectedArea' | transloco }}</a>
+        <button type="button" class="btn btn-outline" (click)="testCall()">{{ 'home.testHealth' | transloco }}</button>
+      </div>
+
+      @if (currentUser(); as user) {
+        <app-notice-banner class="max-w-xl" tone="success" [message]="'home.localSession' | transloco: { email: user.email, role: user.role }"/>
+        <div class="flex flex-wrap gap-3">
+          <a routerLink="/profile" class="btn btn-ghost btn-sm">{{ 'home.backToPrivate' | transloco }}</a>
+        </div>
+      }
+
+      @if (message()) {
+        <app-notice-banner class="max-w-xl" tone="info" [message]="'common.backendResponse' | transloco: { value: message() }"/>
+      }
+
+      @if (!currentUser()) {
+        <app-empty-state
+          class="max-w-xl"
+          [title]="'home.noSessionTitle' | transloco"
+          [description]="'home.noSessionDescription' | transloco"
+          [actionLabel]="'login.submit' | transloco"
+          actionLink="/login"
+        />
+      }
+    </app-page-intro>
+
+    <app-stat-panel
+      class="w-full"
+      [title]="'home.demoTitle' | transloco"
+      [subtitle]="'home.demoSubtitle' | transloco"
+      [items]="demoCredentials()"
+      [vertical]="true"
+    >
+      <app-section-card [title]="'home.flowTitle' | transloco" [subtitle]="'home.flowSubtitle' | transloco">
+        <div class="flex flex-wrap gap-2">
+          <div class="badge badge-primary badge-outline">JWT</div>
+          <div class="badge badge-secondary badge-outline">{{ 'profile.refreshToken' | transloco }}</div>
+          <div class="badge badge-accent badge-outline">DaisyUI</div>
+        </div>
+      </app-section-card>
+    </app-stat-panel>
+  </div>
+
+  <div class="mx-auto mt-10 w-full max-w-6xl">
+    <app-section-card
+      [title]="'home.foundationsTitle' | transloco"
+      [subtitle]="'home.foundationsSubtitle' | transloco"
+    >
+      <app-data-list
+        [title]="'home.frontBaseTitle' | transloco"
+        [subtitle]="'home.frontBaseSubtitle' | transloco"
+        [columns]="foundationColumns()"
+        [rows]="foundationRows()"
+      />
+    </app-section-card>
+  </div>
+</section>

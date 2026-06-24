@@ -1,0 +1,52 @@
+<section class="min-h-full px-4 py-10">
+  <div class="mx-auto flex max-w-5xl flex-col gap-6">
+    <div class="flex flex-wrap items-start justify-between gap-4">
+      <app-page-intro
+        [badge]="'profile.badge' | transloco"
+        badgeClass="badge badge-accent badge-outline"
+        [title]="'profile.title' | transloco"
+        [compact]="true"
+      />
+      <a routerLink="/" class="btn btn-ghost">{{ 'profile.backHome' | transloco }}</a>
+    </div>
+
+    @if (currentUser(); as user) {
+      <app-stat-panel [title]="'profile.connectedUser' | transloco" [items]="[
+        { label: ('profile.rows.name' | transloco), value: user.firstName + ' ' + user.lastName },
+        { label: ('profile.rows.email' | transloco), value: user.email },
+        { label: ('profile.rows.role' | transloco), value: user.role },
+        { label: ('profile.rows.emailVerified' | transloco), value: user.emailVerified ? ('profile.verified.yes' | transloco) : ('profile.verified.no' | transloco) }
+      ]">
+        <app-data-list
+          [title]="'profile.sessionMetaTitle' | transloco"
+          [subtitle]="'profile.sessionMetaSubtitle' | transloco"
+          [columns]="sessionColumns()"
+          [rows]="sessionRows(user)"
+        />
+      </app-stat-panel>
+    } @else {
+      <app-empty-state
+        [title]="'profile.missingTitle' | transloco"
+        [description]="'profile.missingDescription' | transloco"
+        [actionLabel]="'profile.backLogin' | transloco"
+        actionLink="/login"
+      />
+    }
+
+    <app-section-card [title]="'profile.actionsTitle' | transloco" [subtitle]="'profile.actionsSubtitle' | transloco">
+      <div class="flex flex-wrap gap-3">
+        <button class="btn btn-primary" type="button" (click)="testProtectedCall()">{{ 'profile.testApi' | transloco }}</button>
+        <button class="btn btn-secondary" type="button" (click)="refreshSession()">{{ 'profile.refreshToken' | transloco }}</button>
+        <button class="btn btn-outline btn-error" type="button" (click)="logout()">{{ 'profile.logout' | transloco }}</button>
+      </div>
+
+      @if (healthMessage()) {
+        <app-notice-banner tone="info" [message]="'common.backendResponse' | transloco: { value: healthMessage() }"/>
+      }
+
+      @if (errorMessage()) {
+        <app-notice-banner tone="warning" [message]="errorMessage()"/>
+      }
+    </app-section-card>
+  </div>
+</section>

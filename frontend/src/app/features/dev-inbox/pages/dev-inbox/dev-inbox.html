@@ -1,0 +1,86 @@
+<section class="min-h-full px-4 py-10">
+  <div class="mx-auto flex max-w-6xl flex-col gap-6">
+    <app-page-intro
+      [badge]="'devInbox.badge' | transloco"
+      badgeClass="badge badge-secondary badge-outline"
+      [title]="'devInbox.title' | transloco"
+      [description]="'devInbox.description' | transloco"
+      [compact]="true"
+    />
+
+    <app-toolbar [title]="'devInbox.toolbarTitle' | transloco" [subtitle]="'devInbox.toolbarSubtitle' | transloco">
+      <button class="btn btn-outline" type="button" (click)="loadMails()">{{ 'common.refresh' | transloco }}</button>
+      <button class="btn btn-outline btn-error" type="button" [disabled]="!mails().length" (click)="clearMails()">{{ 'devInbox.clear' | transloco }}</button>
+      <a class="btn btn-secondary" href="http://localhost:8025" target="_blank" rel="noreferrer">{{ 'devInbox.openMailpit' | transloco }}</a>
+    </app-toolbar>
+
+    <app-notice-banner tone="info" [message]="'devInbox.mailpitHint' | transloco" />
+
+    @if (infoMessage()) {
+      <app-notice-banner tone="success" [message]="infoMessage()" />
+    }
+
+    @if (errorMessage()) {
+      <app-notice-banner tone="error" [message]="errorMessage()" />
+    }
+
+    <div class="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(22rem,1fr)]">
+      <div class="space-y-6">
+        @if (mails().length) {
+          <app-data-list
+            [title]="'devInbox.listTitle' | transloco"
+            [subtitle]="'devInbox.listSubtitle' | transloco"
+            [columns]="columns()"
+            [rows]="rows"
+            [selectable]="true"
+            keyField="id"
+            [selectedKey]="selectedRowKey"
+            [searchPlaceholder]="'devInbox.searchPlaceholder' | transloco"
+            (rowSelected)="selectRow($event)"
+          />
+        } @else if (!loading()) {
+          <app-empty-state
+            [title]="'devInbox.emptyTitle' | transloco"
+            [description]="'devInbox.emptyDescription' | transloco"
+          />
+        }
+      </div>
+
+      <app-section-card
+        [title]="selectedMail ? ('devInbox.detailTitle' | transloco) : ('devInbox.emptyDetailTitle' | transloco)"
+        [subtitle]="selectedMail ? selectedMail.subject : ('devInbox.emptyDetailSubtitle' | transloco)"
+      >
+        @if (selectedMail) {
+          <div class="space-y-5">
+            <div class="rounded-box border border-base-300 bg-base-200/50 p-4">
+              <div class="grid gap-3 text-sm sm:grid-cols-2">
+                <div class="space-y-1">
+                  <p class="font-semibold">{{ 'devInbox.fields.to' | transloco }}</p>
+                  <p class="text-base-content/70">{{ selectedMail.to }}</p>
+                </div>
+                <div class="space-y-1">
+                  <p class="font-semibold">{{ 'devInbox.fields.createdAt' | transloco }}</p>
+                  <p class="text-base-content/70">{{ selectedMailCreatedAt }}</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="space-y-2">
+              <p class="font-semibold">{{ 'devInbox.fields.body' | transloco }}</p>
+              <pre class="max-h-[28rem] overflow-auto whitespace-pre-wrap rounded-box border border-base-300 bg-base-100 p-4 text-sm leading-6">{{ selectedMail.body }}</pre>
+            </div>
+
+            @if (resetLink) {
+              <div class="flex flex-wrap gap-3">
+                <a class="btn btn-primary" [href]="resetLink">{{ 'devInbox.openResetLink' | transloco }}</a>
+                <a class="btn btn-outline" href="http://localhost:8025" target="_blank" rel="noreferrer">{{ 'devInbox.openMailpit' | transloco }}</a>
+              </div>
+            }
+          </div>
+        } @else {
+          <p class="text-sm text-base-content/70">{{ 'devInbox.emptyDetailBody' | transloco }}</p>
+        }
+      </app-section-card>
+    </div>
+  </div>
+</section>

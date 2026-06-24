@@ -1,0 +1,18 @@
+# IntelliJ
+.idea/
+*.iml
+
+# Node / Angular
+node_modules/
+dist/
+
+# Logs
+logs/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Java
+target/

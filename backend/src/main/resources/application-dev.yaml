@@ -1,0 +1,84 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/boilerplate_db
+    username: postgres
+    password: postgres
+
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}
+    properties:
+      mail:
+        smtp:
+          auth: false
+          starttls:
+            enable: false
+
+  jpa:
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+  flyway:
+    enabled: true
+
+server:
+  port: 8080
+
+logging:
+  pattern:
+    level: "%5p [requestId:%X{requestId:-}]"
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    display-request-duration: true
+
+app:
+  cors:
+    allowed-origin: http://localhost:4200
+  frontend:
+    base-url: http://localhost:4200
+  storage:
+    endpoint: http://localhost:9000
+    public-endpoint: http://localhost:9000
+    access-key: minioadmin
+    secret-key: minioadmin
+    bucket: boilerplate-files
+    presigned-expiry-minutes: 15
+    max-file-size-bytes: 20971520
+    allowed-content-types:
+      - image/*
+      - application/pdf
+      - text/*
+      - text/csv
+      - application/json
+      - application/zip
+      - application/msword
+      - application/vnd.ms-excel
+      - application/vnd.ms-powerpoint
+      - application/vnd.openxmlformats-officedocument.wordprocessingml.document
+      - application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+      - application/vnd.openxmlformats-officedocument.presentationml.presentation
+  auth:
+    password-reset-token-expiration-minutes: 30
+    email-verification-token-expiration-minutes: 1440
+    expired-token-cleanup-fixed-delay-ms: 86400000
+  security:
+    rate-limit:
+      enabled: true
+      max-requests: 10
+      window-seconds: 60
+  mail:
+    smtp-enabled: ${MAIL_ENABLED:true}
+    from-address: ${MAIL_FROM:no-reply@boilerplate.local}
+    dev-inbox-enabled: true
+    dev-inbox-max-entries: 50
+  jwt:
+    secret: 6d8f5b72d2f64f64bca92be8b20ee6aa9fb6a8593d860f72cb1e9d1abf34b821
+    access-token-expiration-minutes: 15
+    refresh-token-expiration-days: 7

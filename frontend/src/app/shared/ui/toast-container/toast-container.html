@@ -1,0 +1,16 @@
+@if (notifications().length) {
+  <div class="toast toast-top toast-end z-50">
+    @for (notification of notifications(); track notification.id) {
+      <div
+        class="alert max-w-sm shadow-lg"
+        [class.alert-info]="notification.tone === 'info'"
+        [class.alert-success]="notification.tone === 'success'"
+        [class.alert-warning]="notification.tone === 'warning'"
+        [class.alert-error]="notification.tone === 'error'"
+      >
+        <span>{{ notification.message }}</span>
+        <button class="btn btn-ghost btn-xs" type="button" (click)="dismiss(notification.id)">x</button>
+      </div>
+    }
+  </div>
+}

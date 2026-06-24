@@ -1,0 +1,18 @@
+<div class="flex w-full flex-col gap-3.5">
+  <label class="text-sm font-semibold tracking-[0.01em] text-base-content/85">
+    {{ label() }}
+    @if (required()) {
+      <span class="text-error">*</span>
+    }
+  </label>
+
+  <ng-content />
+
+  @if (hint() && !error()) {
+    <p class="text-sm leading-6 text-base-content/60">{{ hint() }}</p>
+  }
+
+  @if (error()) {
+    <p class="text-sm leading-6 text-error">{{ error() }}</p>
+  }
+</div>

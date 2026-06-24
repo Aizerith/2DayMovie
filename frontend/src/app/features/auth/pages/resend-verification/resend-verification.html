@@ -1,0 +1,44 @@
+<section class="hero min-h-full px-4 py-8 sm:py-12">
+  <div class="hero-content w-full max-w-6xl items-stretch flex-col gap-10 lg:flex-row-reverse lg:items-start">
+    <app-page-intro
+      class="w-full"
+      [badge]="'resendVerification.badge' | transloco"
+      badgeClass="badge badge-info badge-outline"
+      [title]="'resendVerification.title' | transloco"
+      [description]="'resendVerification.description' | transloco"
+      [compact]="true"
+    >
+      <div class="space-y-6">
+        <app-section-card [title]="'resendVerification.helpTitle' | transloco" [subtitle]="'resendVerification.helpSubtitle' | transloco">
+          <p class="text-sm text-base-content/70">{{ 'resendVerification.helpBody' | transloco }}</p>
+        </app-section-card>
+        <div class="pt-1">
+          <a routerLink="/login" class="btn btn-ghost min-h-11 justify-start px-0">{{ 'resendVerification.backLogin' | transloco }}</a>
+        </div>
+      </div>
+    </app-page-intro>
+
+    <div class="card w-full max-w-xl rounded-[2rem] border border-base-300/35 bg-base-100 shadow-2xl">
+      <div class="card-body gap-8 p-6 sm:p-8">
+        <form class="space-y-7" [formGroup]="form" (ngSubmit)="submit()">
+          <div class="flex flex-wrap items-center gap-2 text-xs font-medium uppercase tracking-[0.18em] text-base-content/45">
+            <span class="badge badge-ghost badge-sm">Compte public</span>
+            <span class="badge badge-ghost badge-sm">Lien vérifié</span>
+          </div>
+
+          <app-form-field [label]="'common.email' | transloco" [required]="true" [error]="fieldError()" [hint]="'resendVerification.emailHint' | transloco">
+            <input class="input input-bordered input-lg h-14 w-full rounded-2xl bg-base-100/80 px-4 shadow-inner shadow-base-300/15 transition focus:outline-none focus:ring-2 focus:ring-primary/20"
+                   type="email" formControlName="email" placeholder="utilisateur@demo.dev" autocomplete="email">
+          </app-form-field>
+
+          <app-form-actions
+            [submitLabel]="'resendVerification.submit' | transloco"
+            [submitting]="submitting()"
+            submitTestId="resend-verification-submit"
+            (cancelled)="form.reset({email: ''})"
+          />
+        </form>
+      </div>
+    </div>
+  </div>
+</section>

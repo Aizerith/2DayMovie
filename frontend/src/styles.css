@@ -1,0 +1,107 @@
+/* You can add global styles to this file, and also import other style files */
+@import "tailwindcss";
+@plugin "daisyui" {
+  themes: false;
+}
+
+@plugin "daisyui/theme" {
+  name: "boilerplate";
+  default: true;
+  prefersdark: false;
+  color-scheme: light;
+
+  --color-base-100: oklch(98% 0.01 95);
+  --color-base-200: oklch(95% 0.02 92);
+  --color-base-300: oklch(88% 0.03 88);
+  --color-base-content: oklch(24% 0.03 244);
+
+  --color-primary: oklch(45% 0.14 246);
+  --color-primary-content: oklch(98% 0.01 95);
+
+  --color-secondary: oklch(62% 0.16 38);
+  --color-secondary-content: oklch(98% 0.01 95);
+
+  --color-accent: oklch(72% 0.13 182);
+  --color-accent-content: oklch(20% 0.03 200);
+
+  --color-neutral: oklch(28% 0.03 244);
+  --color-neutral-content: oklch(96% 0.01 95);
+
+  --color-info: oklch(72% 0.1 235);
+  --color-info-content: oklch(24% 0.03 244);
+
+  --color-success: oklch(74% 0.14 158);
+  --color-success-content: oklch(23% 0.03 164);
+
+  --color-warning: oklch(82% 0.15 82);
+  --color-warning-content: oklch(30% 0.06 66);
+
+  --color-error: oklch(68% 0.2 25);
+  --color-error-content: oklch(98% 0.01 95);
+
+  --radius-selector: 1rem;
+  --radius-field: 1rem;
+  --radius-box: 1.5rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 1;
+  --noise: 0;
+}
+
+@plugin "daisyui/theme" {
+  name: "boilerplate-dark";
+  default: false;
+  prefersdark: true;
+  color-scheme: dark;
+
+  --color-base-100: oklch(22% 0.02 255);
+  --color-base-200: oklch(18% 0.02 255);
+  --color-base-300: oklch(28% 0.02 255);
+  --color-base-content: oklch(94% 0.01 95);
+
+  --color-primary: oklch(72% 0.12 245);
+  --color-primary-content: oklch(20% 0.02 250);
+
+  --color-secondary: oklch(74% 0.13 42);
+  --color-secondary-content: oklch(20% 0.02 42);
+
+  --color-accent: oklch(76% 0.12 184);
+  --color-accent-content: oklch(18% 0.02 184);
+
+  --color-neutral: oklch(30% 0.02 255);
+  --color-neutral-content: oklch(94% 0.01 95);
+
+  --color-info: oklch(76% 0.09 235);
+  --color-info-content: oklch(18% 0.02 235);
+
+  --color-success: oklch(78% 0.12 160);
+  --color-success-content: oklch(20% 0.02 160);
+
+  --color-warning: oklch(82% 0.14 85);
+  --color-warning-content: oklch(24% 0.03 85);
+
+  --color-error: oklch(72% 0.17 28);
+  --color-error-content: oklch(18% 0.02 28);
+
+  --radius-selector: 1rem;
+  --radius-field: 1rem;
+  --radius-box: 1.5rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 1;
+  --noise: 0;
+}
+
+@layer base {
+  html {
+    background:
+      radial-gradient(circle at top, color-mix(in oklab, var(--color-secondary) 12%, white) 0%, transparent 28%),
+      linear-gradient(180deg, var(--color-base-200), var(--color-base-100));
+  }
+
+  body {
+    min-height: 100vh;
+  }
+}

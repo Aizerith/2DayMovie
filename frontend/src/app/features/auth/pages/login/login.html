@@ -1,0 +1,67 @@
+<section class="hero min-h-full px-4 py-8 sm:py-12">
+  <div class="hero-content w-full max-w-6xl items-stretch flex-col gap-10 lg:flex-row-reverse lg:items-start">
+    <app-page-intro
+      class="w-full"
+      [badge]="'login.badge' | transloco"
+      badgeClass="badge badge-secondary badge-outline"
+      [title]="'login.title' | transloco"
+      [description]="'login.description' | transloco"
+      [compact]="true"
+    >
+      <div class="space-y-6">
+        <div class="mockup-code text-sm shadow-lg">
+          <pre><code>email: admin&#64;local.dev</code></pre>
+          <pre><code>password: Admin123!</code></pre>
+        </div>
+
+        <app-section-card [title]="'login.whyTitle' | transloco" [subtitle]="'login.whySubtitle' | transloco">
+          <p class="text-sm text-base-content/70">
+            {{ 'login.whyBody' | transloco }}
+          </p>
+        </app-section-card>
+
+        <app-section-card [title]="'login.linksTitle' | transloco" [subtitle]="'login.linksSubtitle' | transloco">
+          <nav class="grid gap-3 sm:grid-cols-2">
+            <a routerLink="/register" class="btn btn-outline btn-primary min-h-12 justify-start">{{ 'login.register' | transloco }}</a>
+            <a routerLink="/forgot-password" class="btn btn-outline min-h-12 justify-start">{{ 'login.forgotPassword' | transloco }}</a>
+            <a routerLink="/resend-verification" class="btn btn-outline min-h-12 justify-start sm:col-span-2">{{ 'login.resendVerification' | transloco }}</a>
+            <a routerLink="/" class="btn btn-ghost min-h-11 justify-start sm:col-span-2">{{ 'login.backHome' | transloco }}</a>
+          </nav>
+        </app-section-card>
+      </div>
+    </app-page-intro>
+
+    <div class="card w-full max-w-xl rounded-[2rem] border border-base-300/35 bg-base-100 shadow-2xl">
+      <div class="card-body gap-8 p-6 sm:p-8">
+        <form class="space-y-7" [formGroup]="form" (ngSubmit)="submit()">
+          <div class="flex flex-wrap items-center gap-2 text-xs font-medium uppercase tracking-[0.18em] text-base-content/45">
+            <span class="badge badge-ghost badge-sm">JWT</span>
+            <span class="badge badge-ghost badge-sm">Refresh</span>
+            <span class="badge badge-ghost badge-sm">Session locale</span>
+          </div>
+
+          <app-form-field [label]="'login.emailLabel' | transloco" [hint]="'login.emailHint' | transloco">
+            <input class="input input-bordered input-lg h-14 w-full rounded-2xl bg-base-100/80 px-4 shadow-inner shadow-base-300/15 transition focus:outline-none focus:ring-2 focus:ring-primary/20"
+                   data-testid="login-email" type="email" formControlName="email" placeholder="admin@local.dev" autocomplete="email">
+          </app-form-field>
+
+          <app-form-field [label]="'login.passwordLabel' | transloco" [hint]="'login.passwordHint' | transloco">
+            <input class="input input-bordered input-lg h-14 w-full rounded-2xl bg-base-100/80 px-4 shadow-inner shadow-base-300/15 transition focus:outline-none focus:ring-2 focus:ring-primary/20"
+                   data-testid="login-password" type="password" formControlName="password" placeholder="Admin123!" autocomplete="current-password">
+          </app-form-field>
+
+          @if (errorMessage()) {
+            <app-notice-banner tone="error" [message]="errorMessage()"/>
+          }
+
+          <button class="btn btn-primary btn-lg mt-3 h-14 w-full gap-2 shadow-xl shadow-primary/20" data-testid="login-submit" type="submit" [disabled]="isSubmitting()">
+            @if (isSubmitting()) {
+              <span class="loading loading-spinner loading-sm"></span>
+            }
+            {{ isSubmitting() ? ('login.submitting' | transloco) : ('login.submit' | transloco) }}
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</section>

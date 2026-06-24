@@ -1,0 +1,153 @@
+<section class="min-h-full px-4 py-10">
+  <div class="mx-auto flex max-w-6xl flex-col gap-6">
+    <app-page-intro
+      [badge]="'files.badge' | transloco"
+      badgeClass="badge badge-accent badge-outline"
+      [title]="'files.title' | transloco"
+      [description]="'files.description' | transloco"
+      [compact]="true"
+    />
+
+    <app-toolbar
+      [title]="'files.toolbarTitle' | transloco"
+      [subtitle]="canViewAll() ? ('files.toolbarSubtitleGlobal' | transloco) : ('files.toolbarSubtitleUser' | transloco)"
+    >
+      <button class="btn btn-primary" data-testid="files-upload" type="button" [disabled]="!selectedLocalFile() || uploading()" (click)="uploadSelected()">
+        {{ uploading() ? ('files.uploading' | transloco) : ('files.upload' | transloco) }}
+      </button>
+      <button class="btn btn-outline" type="button" (click)="loadFiles()">{{ 'common.refresh' | transloco }}</button>
+      <button
+        class="btn btn-outline"
+        type="button"
+        [disabled]="!selectedStoredFile || selectedStoredFile.status !== 'READY' || working()"
+        (click)="downloadSelected()"
+      >
+        {{ 'files.download' | transloco }}
+      </button>
+      <button class="btn btn-outline btn-error" type="button" [disabled]="!selectedStoredFile || working()" (click)="askDelete()">
+        {{ 'common.delete' | transloco }}
+      </button>
+    </app-toolbar>
+
+    @if (infoMessage()) {
+      <app-notice-banner tone="success" [message]="infoMessage()" />
+    }
+
+    @if (errorMessage()) {
+      <app-notice-banner tone="error" [message]="errorMessage()" />
+    }
+
+    <div class="grid gap-6 xl:grid-cols-[minmax(0,1.5fr)_minmax(24rem,1fr)]">
+      <div class="space-y-6">
+        @if (files().length) {
+          <app-data-list
+            [title]="'files.listTitle' | transloco"
+            [subtitle]="'files.listSubtitle' | transloco"
+            [columns]="columns()"
+            [rows]="rows"
+            [selectable]="true"
+            [serverSide]="true"
+            [totalItems]="totalItems()"
+            [currentPageIndex]="page()"
+            [initialPageSize]="pageSize()"
+            [searchable]="false"
+            keyField="id"
+            [selectedKey]="selectedRowKey"
+            [searchPlaceholder]="'files.searchPlaceholder' | transloco"
+            (rowSelected)="selectRow($event)"
+            (pageChanged)="updatePage($event)"
+            (pageSizeChanged)="updatePageSize($event)"
+            (sortChanged)="updateSort($event)"
+          />
+        } @else if (!loading()) {
+          <app-empty-state
+            [title]="'files.emptyTitle' | transloco"
+            [description]="'files.emptyDescription' | transloco"
+            [actionLabel]="'files.emptyAction' | transloco"
+            actionLink="/files"
+          />
+        }
+      </div>
+
+      <app-section-card
+        [title]="'files.panelTitle' | transloco"
+        [subtitle]="selectedLocalFile() ? ('files.panelSubtitleSelected' | transloco) : ('files.panelSubtitleDefault' | transloco)"
+      >
+        <div class="space-y-6">
+          <label class="form-control gap-3">
+            <span class="label-text font-semibold">{{ 'files.pickLabel' | transloco }}</span>
+            <input class="file-input file-input-bordered w-full" data-testid="files-input" type="file" (change)="onFilePicked($event)">
+            <span class="text-sm text-base-content/60">{{ 'files.pickHint' | transloco }}</span>
+          </label>
+
+          @if (selectedLocalFile(); as localFile) {
+            <div class="rounded-box border border-base-300 bg-base-200/50 px-4 py-4">
+              <div class="space-y-2">
+                <p class="text-sm font-semibold text-base-content/70">{{ 'files.localPreviewTitle' | transloco }}</p>
+                <p class="font-medium">{{ localFile.name }}</p>
+                <p class="text-sm text-base-content/70">{{ localFile.type || 'application/octet-stream' }}</p>
+                <p class="text-sm text-base-content/70">{{ formatSize(localFile.size) }}</p>
+              </div>
+              <div class="mt-4 flex flex-wrap gap-2">
+                <button class="btn btn-primary btn-sm" type="button" [disabled]="uploading()" (click)="uploadSelected()">
+                  {{ uploading() ? ('files.uploading' | transloco) : ('files.upload' | transloco) }}
+                </button>
+                <button class="btn btn-ghost btn-sm" type="button" [disabled]="uploading()" (click)="clearLocalSelection()">
+                  {{ 'files.clearSelection' | transloco }}
+                </button>
+              </div>
+            </div>
+          }
+
+          @if (selectedStoredFile; as storedFile) {
+            <div class="rounded-box border border-base-300 bg-base-200/50 px-4 py-4">
+              <div class="space-y-3">
+                <div>
+                  <p class="text-sm font-semibold text-base-content/70">{{ 'files.remoteTitle' | transloco }}</p>
+                  <p class="font-medium">{{ storedFile.originalFilename }}</p>
+                </div>
+                <div class="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <p class="text-sm font-semibold text-base-content/70">{{ 'files.meta.status' | transloco }}</p>
+                    <p>{{ statusLabel(storedFile.status) }}</p>
+                  </div>
+                  <div>
+                    <p class="text-sm font-semibold text-base-content/70">{{ 'files.meta.size' | transloco }}</p>
+                    <p>{{ formatSize(storedFile.sizeBytes) }}</p>
+                  </div>
+                  <div>
+                    <p class="text-sm font-semibold text-base-content/70">{{ 'files.meta.owner' | transloco }}</p>
+                    <p>{{ storedFile.ownerName }}</p>
+                  </div>
+                  <div>
+                    <p class="text-sm font-semibold text-base-content/70">{{ 'files.meta.updatedAt' | transloco }}</p>
+                    <p>{{ formatDate(storedFile.updatedAt) }}</p>
+                  </div>
+                  <div class="sm:col-span-2">
+                    <p class="text-sm font-semibold text-base-content/70">{{ 'files.meta.contentType' | transloco }}</p>
+                    <p>{{ storedFile.contentType }}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          } @else {
+            <div class="rounded-box border border-dashed border-base-300 px-4 py-6 text-sm text-base-content/60">
+              {{ 'files.noRemoteSelection' | transloco }}
+            </div>
+          }
+        </div>
+      </app-section-card>
+    </div>
+  </div>
+
+  <app-modal-confirm
+    [open]="deleteModalOpen()"
+    [title]="'files.deleteTitle' | transloco"
+    [message]="selectedStoredFile ? ('files.deleteMessage' | transloco: { name: selectedStoredFile.originalFilename }) : ('files.noSelection' | transloco)"
+    [confirmLabel]="'common.delete' | transloco"
+    [cancelLabel]="'common.cancel' | transloco"
+    tone="error"
+    (confirmed)="confirmDelete()"
+    (cancelled)="cancelDelete()"
+  />
+</section>

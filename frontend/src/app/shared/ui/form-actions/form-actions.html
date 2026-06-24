@@ -1,0 +1,12 @@
+<div class="flex flex-col-reverse gap-3 pt-6 sm:flex-row sm:items-center">
+  <button class="btn btn-primary w-full gap-2 shadow-lg shadow-primary/15 sm:min-w-44 sm:w-auto" type="submit" [attr.data-testid]="submitTestId() || null" [disabled]="disabled() || submitting()">
+    @if (submitting()) {
+      <span class="loading loading-spinner loading-sm"></span>
+    }
+    {{ submitting() ? busyLabel() : resolvedSubmitLabel() }}
+  </button>
+
+  @if (showCancel()) {
+    <button class="btn btn-ghost w-full sm:w-auto" type="button" (click)="cancelled.emit()">{{ resolvedCancelLabel() }}</button>
+  }
+</div>

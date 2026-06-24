@@ -1,0 +1,18 @@
+<div class="space-y-5" [class.max-w-lg]="compact()" [class.max-w-2xl]="!compact()">
+  @if (badge()) {
+    <div [class]="badgeClass()">{{ badge() }}</div>
+  }
+
+  <div class="space-y-4">
+    <h1 class="font-black leading-none" [class.text-4xl]="compact()" [class.sm:text-5xl]="compact()"
+        [class.text-5xl]="!compact()" [class.sm:text-6xl]="!compact()">
+      {{ title() }}
+    </h1>
+
+    @if (description()) {
+      <p class="max-w-xl text-base leading-8 text-base-content/72 sm:text-lg">{{ description() }}</p>
+    }
+  </div>
+
+  <ng-content />
+</div>

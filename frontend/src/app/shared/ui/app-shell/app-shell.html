@@ -1,0 +1,52 @@
+<div [attr.data-theme]="theme()" class="min-h-screen bg-base-200 text-base-content">
+  <div class="navbar border-b border-base-300 bg-base-100/85 px-4 shadow-sm backdrop-blur">
+    <div class="mx-auto flex w-full max-w-6xl items-center gap-3">
+      <a [routerLink]="currentUser() ? '/profile' : '/'" class="btn btn-ghost px-2 text-lg font-black tracking-tight">{{ 'common.appName' | transloco }}</a>
+
+      <div class="hidden flex-1 items-center gap-2 md:flex">
+        <a routerLink="/" routerLinkActive="btn-active" [routerLinkActiveOptions]="{exact: true}" class="btn btn-ghost btn-sm">
+          {{ 'common.home' | transloco }}
+        </a>
+        <a routerLink="/profile" routerLinkActive="btn-active" data-testid="nav-profile" class="btn btn-ghost btn-sm">
+          {{ 'common.profile' | transloco }}
+        </a>
+        <a routerLink="/projects" routerLinkActive="btn-active" data-testid="nav-projects" class="btn btn-ghost btn-sm">
+          {{ 'common.projects' | transloco }}
+        </a>
+        <a routerLink="/tasks" routerLinkActive="btn-active" data-testid="nav-tasks" class="btn btn-ghost btn-sm">
+          {{ 'common.tasks' | transloco }}
+        </a>
+        <a routerLink="/files" routerLinkActive="btn-active" data-testid="nav-files" class="btn btn-ghost btn-sm">
+          {{ 'common.files' | transloco }}
+        </a>
+        @if (isAdmin()) {
+          <a routerLink="/users" routerLinkActive="btn-active" data-testid="nav-users" class="btn btn-ghost btn-sm">
+            {{ 'common.users' | transloco }}
+          </a>
+          <a routerLink="/dev-inbox" routerLinkActive="btn-active" data-testid="nav-dev-inbox" class="btn btn-ghost btn-sm">
+            {{ 'common.devInbox' | transloco }}
+          </a>
+        }
+      </div>
+
+      <div class="ml-auto flex items-center gap-2">
+        @if (currentUser(); as user) {
+          <div class="badge badge-outline hidden sm:flex">{{ user.role }} | {{ user.email }}</div>
+        }
+
+        <div class="join hidden sm:flex">
+          <button class="join-item btn btn-ghost btn-sm" type="button" [class.btn-active]="activeLang() === 'fr'" (click)="setLanguage('fr')">FR</button>
+          <button class="join-item btn btn-ghost btn-sm" type="button" [class.btn-active]="activeLang() === 'en'" (click)="setLanguage('en')">EN</button>
+        </div>
+
+        <button class="btn btn-ghost btn-sm" type="button" (click)="toggleTheme()">
+          {{ 'shell.theme' | transloco }}: {{ themeLabel() }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <main class="min-h-[calc(100vh-4rem)]">
+    <ng-content />
+  </main>
+</div>
