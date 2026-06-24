@@ -1,22 +1,11 @@
 # Playwright E2E
 
-## Prerequis
+Les tests Playwright valident l interface 2DayMovie avec des appels API et stockage mockes.
+Ils n ont besoin que du serveur Angular.
 
-- backend demarre en profil `dev`
-- frontend demarre sur `http://localhost:4200`
-
-Par defaut, les tests utilisent :
-
-- email : `admin@local.dev`
-- mot de passe : `Admin123!`
-- assigne par defaut : `Manager Local (MANAGER)`
-
-Tu peux surcharger ces valeurs avec :
+## Variable utile
 
 - `PLAYWRIGHT_BASE_URL`
-- `PLAYWRIGHT_AUTH_EMAIL`
-- `PLAYWRIGHT_AUTH_PASSWORD`
-- `PLAYWRIGHT_ASSIGNEE_LABEL`
 
 ## Commandes
 
@@ -28,15 +17,9 @@ npm run e2e
 npm run e2e:ui
 ```
 
-## Couverture initiale
+## Couverture
 
-- redirection vers login sur route protegee
-- connexion UI
-- creation d un projet
-- creation d une tache avec assignation
-
-## Convention de stabilite
-
-- privilegier `data-testid` pour les actions critiques et les champs de formulaire
-- eviter de cibler les boutons par leur texte quand ce texte depend de la langue active
-- garder les assertions texte pour le contenu metier cree pendant le test, par exemple un nom de projet ou de tache genere dynamiquement
+- creation d un salon prive avec upload mocke
+- affichage du lien partage et du PIN genere
+- ouverture d un salon avec PIN
+- affichage des reglages de sous-titres

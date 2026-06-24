@@ -29,9 +29,16 @@ export interface WatchRoomAccessResponse {
   title: string;
   videoUrl: string;
   subtitleUrl: string | null;
+  subtitleTracks: SubtitleTrackResponse[];
   videoContentType: string;
   playbackTimeSeconds: number;
   playing: boolean;
+}
+
+export interface SubtitleTrackResponse {
+  label: string;
+  language: string;
+  url: string;
 }
 
 export interface PlaybackSyncMessage {

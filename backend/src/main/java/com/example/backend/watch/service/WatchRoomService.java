@@ -1,5 +1,7 @@
 package com.example.backend.watch.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.example.backend.common.config.AppProperties;
 import com.example.backend.watch.dto.AccessWatchRoomRequest;
 import com.example.backend.watch.dto.CompleteWatchRoomRequest;
@@ -7,23 +9,35 @@ import com.example.backend.watch.dto.CreateWatchRoomRequest;
 import com.example.backend.watch.dto.CreateWatchRoomResponse;
 import com.example.backend.watch.dto.PlaybackSyncMessage;
 import com.example.backend.watch.dto.PresignedUpload;
+import com.example.backend.watch.dto.SubtitleTrackResponse;
 import com.example.backend.watch.dto.UploadAssetRequest;
 import com.example.backend.watch.dto.WatchRoomAccessResponse;
+import com.example.backend.watch.entity.SubtitleTrackSource;
 import com.example.backend.watch.entity.WatchRoom;
 import com.example.backend.watch.entity.WatchRoomStatus;
+import com.example.backend.watch.entity.WatchSubtitleTrack;
 import com.example.backend.watch.repository.WatchRoomRepository;
+import com.example.backend.watch.repository.WatchSubtitleTrackRepository;
 import io.minio.BucketExistsArgs;
+import io.minio.GetObjectArgs;
 import io.minio.GetPresignedObjectUrlArgs;
 import io.minio.MakeBucketArgs;
 import io.minio.MinioClient;
+import io.minio.PutObjectArgs;
 import io.minio.StatObjectArgs;
 import io.minio.StatObjectResponse;
 import io.minio.errors.ErrorResponseException;
 import io.minio.http.Method;
 import java.net.URI;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
@@ -45,8 +59,10 @@ public class WatchRoomService {
     private static final String SHARE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
     private final WatchRoomRepository watchRoomRepository;
+    private final WatchSubtitleTrackRepository subtitleTrackRepository;
     private final AppProperties appProperties;
     private final PasswordEncoder passwordEncoder;
+    private final ObjectMapper objectMapper;
 
     @Qualifier("internalMinioClient")
     private final MinioClient internalMinioClient;
@@ -106,6 +122,7 @@ public class WatchRoomService {
             room.setSubtitleEtag(subtitleStat.etag());
         }
 
+        refreshSubtitleTracks(room);
         room.setStatus(WatchRoomStatus.READY);
         return toAccessResponse(room);
     }
@@ -137,15 +154,198 @@ public class WatchRoomService {
     }
 
     private WatchRoomAccessResponse toAccessResponse(WatchRoom room) {
+        List<SubtitleTrackResponse> subtitleTracks = subtitleTrackRepository.findAllByRoomOrderByDisplayOrderAsc(room)
+                .stream()
+                .map(track -> new SubtitleTrackResponse(
+                        track.getLabel(),
+                        track.getLanguage(),
+                        generateDownloadUrl(track.getObjectKey(), "text/vtt")
+                ))
+                .toList();
+
         return new WatchRoomAccessResponse(
                 room.getShareCode(),
                 room.getTitle(),
                 generateDownloadUrl(room.getVideoObjectKey(), room.getVideoContentType()),
-                room.getSubtitleObjectKey() == null ? null : generateDownloadUrl(room.getSubtitleObjectKey(), "text/vtt"),
+                subtitleTracks.isEmpty() ? null : subtitleTracks.getFirst().url(),
+                subtitleTracks,
                 room.getVideoContentType(),
                 room.getPlaybackTimeSeconds(),
                 room.isPlaying()
         );
+    }
+
+    private void refreshSubtitleTracks(WatchRoom room) {
+        subtitleTrackRepository.deleteAllByRoom(room);
+
+        List<WatchSubtitleTrack> tracks = new ArrayList<>();
+        int order = 0;
+
+        if (room.getSubtitleObjectKey() != null) {
+            tracks.add(buildSubtitleTrack(
+                    room,
+                    labelFromFilename(room.getSubtitleOriginalFilename(), "Sous-titres"),
+                    "fr",
+                    room.getSubtitleObjectKey(),
+                    SubtitleTrackSource.UPLOADED,
+                    order++
+            ));
+        }
+
+        tracks.addAll(extractEmbeddedSubtitleTracks(room, order));
+        subtitleTrackRepository.saveAll(tracks);
+    }
+
+    private List<WatchSubtitleTrack> extractEmbeddedSubtitleTracks(WatchRoom room, int firstOrder) {
+        Path workingDirectory = null;
+
+        try {
+            workingDirectory = Files.createTempDirectory("2daymovie-subtitles-");
+            Path videoPath = workingDirectory.resolve("source-" + sanitizePathSegment(room.getVideoOriginalFilename()));
+            downloadObject(room.getVideoObjectKey(), videoPath);
+
+            List<EmbeddedSubtitleStream> streams = probeSubtitleStreams(videoPath);
+            List<WatchSubtitleTrack> tracks = new ArrayList<>();
+            int order = firstOrder;
+
+            for (EmbeddedSubtitleStream stream : streams) {
+                Path outputPath = workingDirectory.resolve("subtitle-" + stream.index() + ".vtt");
+
+                if (!extractSubtitle(videoPath, stream.index(), outputPath) || !Files.exists(outputPath) || Files.size(outputPath) == 0) {
+                    continue;
+                }
+
+                String objectKey = generateSubtitleObjectKey(room.getShareCode(), stream.index(), stream.language());
+                uploadSubtitle(outputPath, objectKey);
+                tracks.add(buildSubtitleTrack(
+                        room,
+                        stream.label(),
+                        stream.language(),
+                        objectKey,
+                        SubtitleTrackSource.EXTRACTED,
+                        order++
+                ));
+            }
+
+            return tracks;
+        } catch (Exception exception) {
+            return List.of();
+        } finally {
+            deleteDirectoryQuietly(workingDirectory);
+        }
+    }
+
+    private List<EmbeddedSubtitleStream> probeSubtitleStreams(Path videoPath) throws Exception {
+        ProcessResult result = runProcess(List.of(
+                "ffprobe",
+                "-v", "quiet",
+                "-print_format", "json",
+                "-show_streams",
+                "-select_streams", "s",
+                videoPath.toString()
+        ));
+
+        if (result.exitCode() != 0 || !StringUtils.hasText(result.output())) {
+            return List.of();
+        }
+
+        JsonNode streams = objectMapper.readTree(result.output()).path("streams");
+        if (!streams.isArray()) {
+            return List.of();
+        }
+
+        List<EmbeddedSubtitleStream> subtitleStreams = new ArrayList<>();
+        int fallbackOrder = 1;
+
+        for (JsonNode stream : streams) {
+            int index = stream.path("index").asInt(-1);
+            if (index < 0) {
+                continue;
+            }
+
+            JsonNode tags = stream.path("tags");
+            String language = normalizeLanguage(tags.path("language").asText(""));
+            String title = tags.path("title").asText("");
+            String label = StringUtils.hasText(title)
+                    ? title.trim()
+                    : "Sous-titres " + language.toUpperCase(Locale.ROOT);
+
+            if (!StringUtils.hasText(label)) {
+                label = "Sous-titres " + fallbackOrder;
+            }
+
+            subtitleStreams.add(new EmbeddedSubtitleStream(index, language, label));
+            fallbackOrder++;
+        }
+
+        return subtitleStreams;
+    }
+
+    private boolean extractSubtitle(Path videoPath, int streamIndex, Path outputPath) throws Exception {
+        ProcessResult result = runProcess(List.of(
+                "ffmpeg",
+                "-v", "error",
+                "-y",
+                "-i", videoPath.toString(),
+                "-map", "0:" + streamIndex,
+                "-f", "webvtt",
+                outputPath.toString()
+        ));
+
+        return result.exitCode() == 0;
+    }
+
+    private ProcessResult runProcess(List<String> command) throws Exception {
+        Process process = new ProcessBuilder(command)
+                .redirectErrorStream(true)
+                .start();
+        String output;
+        try (InputStream inputStream = process.getInputStream()) {
+            output = new String(inputStream.readAllBytes());
+        }
+        return new ProcessResult(process.waitFor(), output);
+    }
+
+    private void downloadObject(String objectKey, Path targetPath) throws Exception {
+        try (InputStream inputStream = internalMinioClient.getObject(
+                GetObjectArgs.builder()
+                        .bucket(appProperties.getStorage().getBucket())
+                        .object(objectKey)
+                        .build()
+        )) {
+            Files.copy(inputStream, targetPath);
+        }
+    }
+
+    private void uploadSubtitle(Path subtitlePath, String objectKey) throws Exception {
+        try (InputStream inputStream = Files.newInputStream(subtitlePath)) {
+            internalMinioClient.putObject(
+                    PutObjectArgs.builder()
+                            .bucket(appProperties.getStorage().getBucket())
+                            .object(objectKey)
+                            .contentType("text/vtt")
+                            .stream(inputStream, Files.size(subtitlePath), -1)
+                            .build()
+            );
+        }
+    }
+
+    private WatchSubtitleTrack buildSubtitleTrack(
+            WatchRoom room,
+            String label,
+            String language,
+            String objectKey,
+            SubtitleTrackSource source,
+            int displayOrder
+    ) {
+        WatchSubtitleTrack track = new WatchSubtitleTrack();
+        track.setRoom(room);
+        track.setLabel(StringUtils.hasText(label) ? label.trim() : "Sous-titres");
+        track.setLanguage(normalizeLanguage(language));
+        track.setObjectKey(objectKey);
+        track.setSource(source);
+        track.setDisplayOrder(displayOrder);
+        return track;
     }
 
     private WatchRoom findAndVerifyPin(String shareCode, String pin) {
@@ -284,6 +484,47 @@ public class WatchRoomService {
         return "rooms/" + shareCode + "/" + dateSegment + "/" + UUID.randomUUID() + "-" + sanitizedFilename;
     }
 
+    private String generateSubtitleObjectKey(String shareCode, int streamIndex, String language) {
+        String dateSegment = LocalDate.now().format(KEY_DATE_FORMATTER);
+        return "rooms/" + shareCode + "/" + dateSegment + "/subtitles/" + UUID.randomUUID()
+                + "-track-" + streamIndex + "-" + normalizeLanguage(language) + ".vtt";
+    }
+
+    private String labelFromFilename(String filename, String fallback) {
+        if (!StringUtils.hasText(filename)) {
+            return fallback;
+        }
+
+        String cleaned = normalizeOriginalFilename(filename);
+        int extension = cleaned.lastIndexOf('.');
+        return extension > 0 ? cleaned.substring(0, extension) : cleaned;
+    }
+
+    private String normalizeLanguage(String language) {
+        return StringUtils.hasText(language) ? language.trim().toLowerCase(Locale.ROOT) : "und";
+    }
+
+    private String sanitizePathSegment(String value) {
+        String sanitized = value == null ? "video" : value.replaceAll("[^A-Za-z0-9._-]", "-");
+        return StringUtils.hasText(sanitized) ? sanitized : "video";
+    }
+
+    private void deleteDirectoryQuietly(Path directory) {
+        if (directory == null || !Files.exists(directory)) {
+            return;
+        }
+
+        try (var paths = Files.walk(directory)) {
+            paths.sorted(Comparator.reverseOrder()).forEach(path -> {
+                try {
+                    Files.deleteIfExists(path);
+                } catch (Exception ignored) {
+                }
+            });
+        } catch (Exception ignored) {
+        }
+    }
+
     private String generateShareCode() {
         for (int attempt = 0; attempt < 20; attempt++) {
             StringBuilder builder = new StringBuilder(8);
@@ -296,5 +537,11 @@ public class WatchRoomService {
             }
         }
         return UUID.randomUUID().toString().substring(0, 8).toUpperCase(Locale.ROOT);
+    }
+
+    private record EmbeddedSubtitleStream(int index, String language, String label) {
+    }
+
+    private record ProcessResult(int exitCode, String output) {
     }
 }

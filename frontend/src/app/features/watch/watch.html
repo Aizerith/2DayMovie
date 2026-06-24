@@ -41,13 +41,13 @@
           (timeupdate)="sendSync('time')"
         >
           <source [src]="room()!.videoUrl" [type]="room()!.videoContentType" />
-          @if (room()!.subtitleUrl) {
-            <track kind="subtitles" label="Francais" srclang="fr" [src]="room()!.subtitleUrl!" default />
+          @for (track of room()!.subtitleTracks; track track.url; let first = $first) {
+            <track kind="subtitles" [label]="track.label" [srclang]="track.language" [src]="track.url" [default]="first" />
           }
         </video>
       </div>
 
-      @if (room()!.subtitleUrl) {
+      @if (room()!.subtitleTracks.length) {
         <div class="rounded-lg border border-white/10 bg-base-100 p-4">
           <div class="grid gap-4 md:grid-cols-[1fr_auto] md:items-center">
             <div>
@@ -81,7 +81,7 @@
         </div>
         <div class="rounded-lg border border-white/10 bg-base-100 p-4">
           <p class="text-sm text-base-content/60">Sous-titres</p>
-          <p class="font-semibold">{{ room()!.subtitleUrl ? 'Disponibles dans le lecteur' : 'Aucun fichier VTT' }}</p>
+          <p class="font-semibold">{{ room()!.subtitleTracks.length }} piste(s) disponible(s)</p>
         </div>
         <div class="rounded-lg border border-white/10 bg-base-100 p-4">
           <p class="text-sm text-base-content/60">Synchro</p>

@@ -17,13 +17,13 @@ jobs:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_DB: boilerplate_db
+          POSTGRES_DB: 2daymovie_db
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
         ports:
           - 5432:5432
         options: >-
-          --health-cmd="pg_isready -U postgres -d boilerplate_db"
+          --health-cmd="pg_isready -U postgres -d 2daymovie_db"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=10
@@ -77,31 +77,9 @@ jobs:
       - backend-tests
       - frontend-tests
 
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_DB: boilerplate_db
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd="pg_isready -U postgres -d boilerplate_db"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=10
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Set up Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '21'
-          cache: maven
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -109,10 +87,6 @@ jobs:
           node-version: '22.12.0'
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-
-      - name: Make Maven wrapper executable
-        run: chmod +x mvnw
-        working-directory: backend
 
       - name: Install frontend dependencies
         run: npm ci
@@ -122,28 +96,11 @@ jobs:
         run: npx playwright install --with-deps chromium
         working-directory: frontend
 
-      - name: Start backend
-        run: |
-          ./mvnw spring-boot:run > ../backend-e2e.log 2>&1 &
-          echo $! > ../backend-e2e.pid
-        working-directory: backend
-
       - name: Start frontend
         run: |
           npm start -- --host 127.0.0.1 --port 4200 > ../frontend-e2e.log 2>&1 &
           echo $! > ../frontend-e2e.pid
         working-directory: frontend
-
-      - name: Wait for backend
-        run: |
-          for i in {1..60}; do
-            if curl -fsS http://127.0.0.1:8080/api/health > /dev/null; then
-              exit 0
-            fi
-            sleep 2
-          done
-          echo "Backend did not start in time"
-          exit 1
 
       - name: Wait for frontend
         run: |
@@ -168,12 +125,10 @@ jobs:
           path: |
             frontend/playwright-report
             frontend/test-results
-            backend-e2e.log
             frontend-e2e.log
           if-no-files-found: ignore
 
       - name: Stop local services
         if: always()
         run: |
-          if [ -f backend-e2e.pid ]; then kill $(cat backend-e2e.pid) || true; fi
           if [ -f frontend-e2e.pid ]; then kill $(cat frontend-e2e.pid) || true; fi
