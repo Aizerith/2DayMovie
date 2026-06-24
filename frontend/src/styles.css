@@ -103,3 +103,19 @@
     min-height: 100vh;
   }
 }
+
+@layer components {
+  .cinema-player::cue {
+    color: white;
+    background-color: var(--subtitle-background, rgba(0, 0, 0, 0.42));
+    font-family: Arial, "Helvetica Neue", sans-serif;
+    font-size: calc(4.2vmin * var(--subtitle-scale, 1));
+    font-weight: 600;
+    line-height: 1.28;
+    text-shadow:
+      0 2px 4px rgba(0, 0, 0, 0.95),
+      0 0 8px rgba(0, 0, 0, 0.85),
+      -1px -1px 1px rgba(0, 0, 0, 0.9),
+      1px 1px 1px rgba(0, 0, 0, 0.9);
+  }
+}

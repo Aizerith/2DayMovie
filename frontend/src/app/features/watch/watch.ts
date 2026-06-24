@@ -32,6 +32,8 @@ export class Watch implements OnDestroy {
   readonly room = signal<WatchRoomAccessResponse | null>(null);
   readonly loading = signal(false);
   readonly connected = signal(false);
+  readonly subtitleSize = signal(100);
+  readonly subtitleBackground = signal<'soft' | 'solid' | 'none'>('soft');
 
   unlock(): void {
     const pin = this.pin().trim();
@@ -85,6 +87,17 @@ export class Watch implements OnDestroy {
       destination: `/app/rooms/${this.shareCode}/sync`,
       body: JSON.stringify(message)
     });
+  }
+
+  subtitleBackgroundColor(): string {
+    switch (this.subtitleBackground()) {
+      case 'solid':
+        return 'rgba(0, 0, 0, 0.78)';
+      case 'none':
+        return 'transparent';
+      default:
+        return 'rgba(0, 0, 0, 0.42)';
+    }
   }
 
   ngOnDestroy(): void {
