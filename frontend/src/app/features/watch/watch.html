@@ -6,8 +6,31 @@
         <h1 class="text-2xl font-black md:text-4xl">{{ room()?.title || 'Salon prive' }}</h1>
       </div>
       @if (room()) {
-        <div class="badge" [class.badge-success]="connected()" [class.badge-warning]="!connected()">
-          {{ connected() ? 'Synchronise' : 'Connexion...' }}
+        <div class="flex flex-wrap items-center gap-2">
+          <div class="badge" [class.badge-success]="connected()" [class.badge-warning]="!connected()">
+            {{ connected() ? 'Synchronise' : 'Connexion...' }}
+          </div>
+          @if (room()!.status === 'READY') {
+            <div class="relative">
+              <button class="btn btn-sm btn-outline" type="button" (click)="toggleParticipants()">
+                {{ participants().length }} present(s)
+              </button>
+              @if (participantsOpen()) {
+                <div class="absolute right-0 z-30 mt-2 w-72 rounded-lg border border-white/10 bg-base-100 p-3 shadow-2xl">
+                  <div class="space-y-2">
+                    @for (participant of participants(); track participant.clientId) {
+                      <div class="flex items-center gap-3 rounded-lg bg-base-200 px-3 py-2">
+                        <span class="grid size-8 place-items-center rounded-full bg-primary text-xs font-black text-primary-content">{{ participant.avatar }}</span>
+                        <span class="text-sm font-semibold">{{ participant.displayName }}</span>
+                      </div>
+                    } @empty {
+                      <p class="text-sm text-base-content/55">Aucun participant connecte.</p>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+          }
         </div>
       }
     </div>
@@ -26,6 +49,10 @@
             <p class="text-sm text-base-content/60">Le lien est protege par un PIN a 4 chiffres.</p>
           </div>
           <input class="input input-bordered w-full text-center font-mono text-xl tracking-[0.45em]" name="pin" inputmode="numeric" maxlength="4" [ngModel]="pin()" (ngModelChange)="pin.set($event)" placeholder="0000" />
+          <label class="grid gap-2">
+            <span class="text-sm font-semibold text-base-content/70">Pseudo</span>
+            <input class="input input-bordered w-full" name="participantName" [ngModel]="participantName()" (ngModelChange)="participantName.set($event)" [placeholder]="effectiveParticipantName()" />
+          </label>
           <button class="btn btn-primary w-full" type="submit" [disabled]="loading()">
             {{ loading() ? 'Verification...' : 'Regarder' }}
           </button>
@@ -47,20 +74,7 @@
         </div>
       </div>
     } @else {
-      <div class="relative overflow-hidden rounded-lg border border-white/10 bg-black shadow-2xl shadow-black/40">
-        <div class="absolute right-3 top-3 z-10 rounded-lg border border-white/10 bg-black/65 px-3 py-2 text-white shadow-lg backdrop-blur">
-          <div class="flex items-center gap-2">
-            <span class="text-xs font-semibold uppercase tracking-[0.14em] text-white/60">{{ participants().length }} present(s)</span>
-            <div class="flex -space-x-2">
-              @for (participant of participants().slice(0, 5); track participant.clientId) {
-                <div class="grid size-8 place-items-center rounded-full border border-white/40 bg-primary text-xs font-black text-primary-content" [title]="participant.displayName">
-                  {{ participant.avatar }}
-                </div>
-              }
-            </div>
-          </div>
-        </div>
-
+      <div class="overflow-hidden rounded-lg border border-white/10 bg-black shadow-2xl shadow-black/40">
         <video
           #videoPlayer
           class="cinema-player aspect-video w-full bg-black"
@@ -122,7 +136,7 @@
         </div>
       }
 
-      <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <div class="grid gap-4 md:grid-cols-3">
         <div class="rounded-lg border border-white/10 bg-base-100 p-4">
           <p class="text-sm text-base-content/60">Code salon</p>
           <p class="font-mono text-lg font-bold">{{ shareCode() }}</p>
@@ -130,23 +144,6 @@
         <div class="rounded-lg border border-white/10 bg-base-100 p-4">
           <p class="text-sm text-base-content/60">PIN</p>
           <p class="font-mono text-lg font-bold tracking-[0.3em]">{{ pin() }}</p>
-        </div>
-        <div class="rounded-lg border border-white/10 bg-base-100 p-4">
-          <p class="text-sm text-base-content/60">Pistes</p>
-          <p class="font-semibold">{{ room()!.audioTracks.length }} audio / {{ room()!.subtitleTracks.length }} sous-titre(s)</p>
-        </div>
-        <div class="rounded-lg border border-white/10 bg-base-100 p-4">
-          <p class="text-sm text-base-content/60">Participants</p>
-          <div class="mt-2 flex flex-wrap gap-2">
-            @for (participant of participants(); track participant.clientId) {
-              <span class="inline-flex items-center gap-2 rounded-full border border-white/10 bg-base-200 px-2.5 py-1 text-xs font-semibold">
-                <span class="grid size-6 place-items-center rounded-full bg-primary text-[10px] font-black text-primary-content">{{ participant.avatar }}</span>
-                {{ participant.displayName }}
-              </span>
-            } @empty {
-              <span class="text-sm text-base-content/50">En connexion...</span>
-            }
-          </div>
         </div>
         <div class="rounded-lg border border-white/10 bg-base-100 p-4">
           <p class="text-sm text-base-content/60">Fin de visionnage</p>

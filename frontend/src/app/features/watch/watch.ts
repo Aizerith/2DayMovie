@@ -47,8 +47,9 @@ export class Watch implements OnDestroy, OnInit {
   readonly closing = signal(false);
   readonly roomMessage = signal<string | null>(null);
   readonly participants = signal<PresenceParticipant[]>([]);
-  readonly participantName = signal(this.identity.displayName);
+  readonly participantName = signal('');
   readonly participantAvatar = signal(this.identity.avatar);
+  readonly participantsOpen = signal(false);
 
   unlock(): void {
     const pin = this.pin().trim();
@@ -145,6 +146,15 @@ export class Watch implements OnDestroy, OnInit {
     if (!this.closing()) {
       this.closeConfirmationOpen.set(false);
     }
+  }
+
+  effectiveParticipantName(): string {
+    const name = this.participantName().trim();
+    return name || this.identity.displayName;
+  }
+
+  toggleParticipants(): void {
+    this.participantsOpen.update(open => !open);
   }
 
   closeRoom(): void {
@@ -333,7 +343,7 @@ export class Watch implements OnDestroy, OnInit {
       body: JSON.stringify({
         pin: this.pin(),
         clientId: this.clientId,
-        displayName: this.participantName(),
+        displayName: this.effectiveParticipantName(),
         avatar: this.participantAvatar(),
         event,
         participants: [],
@@ -394,6 +404,7 @@ export class Watch implements OnDestroy, OnInit {
     this.selectedAudioTrackUrl.set(null);
     this.closeConfirmationOpen.set(false);
     this.closing.set(false);
+    this.participantsOpen.set(false);
   }
 
   private createParticipantIdentity(): {displayName: string; avatar: string} {

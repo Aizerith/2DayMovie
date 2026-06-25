@@ -55,6 +55,8 @@ import java.util.concurrent.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -94,6 +96,23 @@ public class WatchRoomService {
 
     @Qualifier("publicMinioClient")
     private final MinioClient publicMinioClient;
+
+    @EventListener(ApplicationReadyEvent.class)
+    @Transactional
+    public void failInterruptedVideoPreparations() {
+        List<WatchRoom> interruptedRooms = watchRoomRepository.findAllByStatus(WatchRoomStatus.PROCESSING);
+        if (interruptedRooms.isEmpty()) {
+            return;
+        }
+
+        interruptedRooms.forEach(room -> {
+            room.setStatus(WatchRoomStatus.FAILED);
+            log.warn(
+                    "Room {} was still processing at application startup and has been marked as FAILED",
+                    room.getShareCode()
+            );
+        });
+    }
 
     @Transactional
     public CreateWatchRoomResponse create(CreateWatchRoomRequest request) {
@@ -150,6 +169,11 @@ public class WatchRoomService {
         refreshUploadedSubtitleTrack(room);
         audioTrackRepository.deleteAllByRoom(room);
         room.setStatus(WatchRoomStatus.PROCESSING);
+        log.info(
+                "Room {} is queued for video preparation, source size {} bytes",
+                room.getShareCode(),
+                room.getVideoSizeBytes()
+        );
         startVideoPreparation(room);
         return toAccessResponse(room);
     }
@@ -216,14 +240,24 @@ public class WatchRoomService {
     }
 
     private WatchRoomAccessResponse toAccessResponse(WatchRoom room) {
-        List<SubtitleTrackResponse> subtitleTracks = subtitleTrackRepository.findAllByRoomOrderByDisplayOrderAsc(room)
+        List<WatchSubtitleTrack> persistedSubtitleTracks = subtitleTrackRepository.findAllByRoomOrderByDisplayOrderAsc(room);
+        List<SubtitleTrackResponse> subtitleTracks = new ArrayList<>(persistedSubtitleTracks
                 .stream()
                 .map(track -> new SubtitleTrackResponse(
                         track.getLabel(),
                         track.getLanguage(),
                         generateDownloadUrl(track.getObjectKey(), "text/vtt")
                 ))
-                .toList();
+                .toList());
+        boolean hasUploadedSubtitleTrack = persistedSubtitleTracks.stream()
+                .anyMatch(track -> room.getSubtitleObjectKey() != null && room.getSubtitleObjectKey().equals(track.getObjectKey()));
+        if (StringUtils.hasText(room.getSubtitleObjectKey()) && !hasUploadedSubtitleTrack) {
+            subtitleTracks.add(0, new SubtitleTrackResponse(
+                    labelFromFilename(room.getSubtitleOriginalFilename(), "Sous-titres"),
+                    "fr",
+                    generateDownloadUrl(room.getSubtitleObjectKey(), "text/vtt")
+            ));
+        }
         List<AudioTrackResponse> audioTracks = audioTrackRepository.findAllByRoomOrderByDisplayOrderAsc(room)
                 .stream()
                 .map(track -> new AudioTrackResponse(
@@ -329,29 +363,53 @@ public class WatchRoomService {
             workingDirectory = Files.createTempDirectory("2daymovie-prepare-");
             Path videoPath = workingDirectory.resolve("source-" + sanitizePathSegment(request.videoOriginalFilename()));
             Path playbackPath = workingDirectory.resolve("playback.mp4");
+            log.info("Room {} preparation started in {}", request.shareCode(), workingDirectory);
+            log.info("Room {} downloading source video from storage", request.shareCode());
             downloadObject(request.videoObjectKey(), videoPath);
+            log.info("Room {} source video downloaded, local size {} bytes", request.shareCode(), Files.size(videoPath));
 
             VideoProbe videoProbe = probeVideo(videoPath);
+            log.info(
+                    "Room {} source probe: container={}, videoCodec={}, audioCodec={}, webFriendly={}",
+                    request.shareCode(),
+                    videoProbe.container(),
+                    videoProbe.videoCodec(),
+                    videoProbe.audioCodec(),
+                    videoProbe.webFriendly()
+            );
             boolean prepared = videoProbe.webFriendly()
                     ? remuxVideo(videoPath, playbackPath)
                     : transcodeVideo(videoPath, playbackPath);
 
             if (!prepared || !Files.exists(playbackPath) || Files.size(playbackPath) == 0) {
+                log.warn("Room {} playback video preparation produced no usable output", request.shareCode());
                 return null;
             }
+            log.info("Room {} playback video prepared locally, size {} bytes", request.shareCode(), Files.size(playbackPath));
 
             if (!roomStillProcessing(request.roomId())) {
+                log.info("Room {} is no longer processing before playback upload; discarding prepared media", request.shareCode());
                 return null;
             }
 
             String playbackObjectKey = generatePlaybackObjectKey(request.shareCode());
+            log.info("Room {} uploading playback video to storage", request.shareCode());
             uploadPlaybackVideo(playbackPath, playbackObjectKey);
             if (!roomStillProcessing(request.roomId())) {
                 deleteObjectBestEffort(playbackObjectKey);
+                log.info("Room {} was closed during playback upload; uploaded playback object deleted", request.shareCode());
                 return null;
             }
+            log.info("Room {} playback video uploaded as {}", request.shareCode(), playbackObjectKey);
 
+            log.info("Room {} extracting embedded subtitle and audio tracks", request.shareCode());
             ExtractedMediaTracks extractedTracks = extractEmbeddedMediaTracks(videoPath, workingDirectory, request);
+            log.info(
+                    "Room {} extracted {} subtitle track(s) and {} audio track(s)",
+                    request.shareCode(),
+                    extractedTracks.subtitleTracks().size(),
+                    extractedTracks.audioTracks().size()
+            );
             return new PreparedRoomMedia(playbackObjectKey, extractedTracks);
         } catch (Exception exception) {
             log.warn("Unable to prepare playback video for room {}", request.shareCode(), exception);
@@ -537,19 +595,22 @@ public class WatchRoomService {
                 "ffprobe",
                 "-v", "quiet",
                 "-print_format", "json",
+                "-show_format",
                 "-show_streams",
                 videoPath.toString()
         ));
 
         if (result.exitCode() != 0 || !StringUtils.hasText(result.output())) {
-            return new VideoProbe(false);
+            return new VideoProbe(false, "", "", "");
         }
 
-        JsonNode streams = objectMapper.readTree(result.output()).path("streams");
+        JsonNode probe = objectMapper.readTree(result.output());
+        JsonNode streams = probe.path("streams");
         if (!streams.isArray()) {
-            return new VideoProbe(false);
+            return new VideoProbe(false, "", "", "");
         }
 
+        String container = probe.path("format").path("format_name").asText("");
         String videoCodec = "";
         String audioCodec = "";
 
@@ -567,7 +628,7 @@ public class WatchRoomService {
         boolean audioReady = !StringUtils.hasText(audioCodec)
                 || "aac".equalsIgnoreCase(audioCodec)
                 || "mp3".equalsIgnoreCase(audioCodec);
-        return new VideoProbe(videoReady && audioReady);
+        return new VideoProbe(videoReady && audioReady, container, videoCodec, audioCodec);
     }
 
     private List<EmbeddedAudioStream> probeAudioStreams(Path videoPath) throws Exception {
@@ -1027,7 +1088,7 @@ public class WatchRoomService {
     private record EmbeddedAudioStream(int index, String language, String label) {
     }
 
-    private record VideoProbe(boolean webFriendly) {
+    private record VideoProbe(boolean webFriendly, String container, String videoCodec, String audioCodec) {
     }
 
     private record PreparedRoomMedia(String playbackVideoObjectKey, ExtractedMediaTracks tracks) {
