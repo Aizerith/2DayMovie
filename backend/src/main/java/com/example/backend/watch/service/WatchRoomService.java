@@ -151,6 +151,7 @@ public class WatchRoomService {
         if (room.getStatus() != WatchRoomStatus.READY) {
             throw new IllegalArgumentException("La video n est pas encore prete");
         }
+        log.info("Access granted for room {}", shareCode);
         return toAccessResponse(room);
     }
 

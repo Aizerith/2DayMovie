@@ -15,6 +15,12 @@
     @if (!room()) {
       <form class="mx-auto max-w-sm rounded-lg border border-white/10 bg-base-100 p-5" (ngSubmit)="unlock()">
         <div class="space-y-4">
+          @if (roomMessage()) {
+            <div class="rounded-lg border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning-content">
+              {{ roomMessage() }}
+            </div>
+          }
+
           <div>
             <h2 class="text-xl font-bold">Entrer dans le salon</h2>
             <p class="text-sm text-base-content/60">Le lien est protege par un PIN a 4 chiffres.</p>

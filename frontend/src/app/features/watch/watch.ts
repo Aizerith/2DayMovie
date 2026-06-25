@@ -39,6 +39,7 @@ export class Watch implements OnDestroy {
   readonly selectedAudioTrackUrl = signal<string | null>(null);
   readonly closeConfirmationOpen = signal(false);
   readonly closing = signal(false);
+  readonly roomMessage = signal<string | null>(null);
 
   unlock(): void {
     const pin = this.pin().trim();
@@ -50,6 +51,7 @@ export class Watch implements OnDestroy {
     this.loading.set(true);
     this.watchRoomService.accessRoom(this.shareCode, pin).subscribe({
       next: room => {
+        this.roomMessage.set(null);
         this.room.set(room);
         this.selectedAudioTrackUrl.set(room.audioTracks[0]?.url ?? null);
         this.loading.set(false);
@@ -154,11 +156,13 @@ export class Watch implements OnDestroy {
     this.closing.set(true);
     this.watchRoomService.closeRoom(this.shareCode, this.pin()).subscribe({
       next: () => {
-        this.leaveClosedRoom('Salon cloture et fichiers supprimes.');
+        this.stopRoomPlayback();
+        this.notificationService.success('Salon cloture et fichiers supprimes.');
+        void this.router.navigateByUrl('/', {replaceUrl: true});
       },
       error: error => {
         if (error?.status === 400 || error?.status === 404) {
-          this.leaveClosedRoom('Salon deja ferme.');
+          this.showClosedRoom('Salon introuvable ou deja ferme.');
           return;
         }
 
@@ -200,7 +204,7 @@ export class Watch implements OnDestroy {
 
   private applyRemote(message: PlaybackSyncMessage): void {
     if (message.event === 'closed') {
-      this.leaveClosedRoom('Le salon a ete cloture.');
+      this.showClosedRoom('Le salon a ete cloture.');
       return;
     }
 
@@ -231,7 +235,13 @@ export class Watch implements OnDestroy {
     window.setTimeout(() => this.applyingRemote = false, 250);
   }
 
-  private leaveClosedRoom(message: string): void {
+  private showClosedRoom(message: string): void {
+    this.stopRoomPlayback();
+    this.roomMessage.set(message);
+    this.notificationService.warning(message);
+  }
+
+  private stopRoomPlayback(): void {
     const video = this.videoPlayer?.nativeElement;
     const audio = this.externalAudio?.nativeElement;
 
@@ -254,8 +264,6 @@ export class Watch implements OnDestroy {
     this.selectedAudioTrackUrl.set(null);
     this.closeConfirmationOpen.set(false);
     this.closing.set(false);
-    this.notificationService.success(message);
-    void this.router.navigateByUrl('/', {replaceUrl: true});
   }
 
   private syncExternalAudio(playWhenVideoPlays = false): void {
