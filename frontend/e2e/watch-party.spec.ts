@@ -27,6 +27,7 @@ test.describe('watch party', () => {
           videoUrl: room.videoUpload.url,
           subtitleUrl: null,
           subtitleTracks: [],
+          audioTracks: [],
           videoContentType: 'video/mp4',
           playbackTimeSeconds: 0,
           playing: false
@@ -70,6 +71,18 @@ test.describe('watch party', () => {
               url: 'https://storage.test/2daymovie-videos/subtitles-en.vtt'
             }
           ],
+          audioTracks: [
+            {
+              label: 'Francais',
+              language: 'fr',
+              url: 'https://storage.test/2daymovie-videos/audio-fr.m4a'
+            },
+            {
+              label: 'English',
+              language: 'en',
+              url: 'https://storage.test/2daymovie-videos/audio-en.m4a'
+            }
+          ],
           videoContentType: 'video/mp4',
           playbackTimeSeconds: 12,
           playing: false
@@ -86,8 +99,9 @@ test.describe('watch party', () => {
     await page.getByRole('button', {name: 'Regarder'}).click();
 
     await expect(page.getByRole('heading', {name: 'Movie night'})).toBeVisible();
-    await expect(page.getByText('Reglage de l')).toBeVisible();
+    await expect(page.getByText('Les pistes extraites')).toBeVisible();
     await expect(page.locator('video')).toBeVisible();
+    await expect(page.locator('select').first()).toContainText('Francais');
     await page.getByRole('button', {name: 'Clore le salon'}).click();
     await expect(page.getByRole('heading', {name: 'Clore le salon ?'})).toBeVisible();
     await page.getByRole('button', {name: 'Confirmer la fermeture'}).click();

@@ -27,6 +27,7 @@ export class Watch implements OnDestroy {
   private lastSentAt = 0;
 
   @ViewChild('videoPlayer') videoPlayer?: ElementRef<HTMLVideoElement>;
+  @ViewChild('externalAudio') externalAudio?: ElementRef<HTMLAudioElement>;
 
   readonly shareCode = this.route.snapshot.paramMap.get('shareCode') ?? '';
   readonly pin = signal('');
@@ -35,6 +36,7 @@ export class Watch implements OnDestroy {
   readonly connected = signal(false);
   readonly subtitleSize = signal(100);
   readonly subtitleBackground = signal<'soft' | 'solid' | 'none'>('soft');
+  readonly selectedAudioTrackUrl = signal<string | null>(null);
   readonly closeConfirmationOpen = signal(false);
   readonly closing = signal(false);
 
@@ -49,11 +51,13 @@ export class Watch implements OnDestroy {
     this.watchRoomService.accessRoom(this.shareCode, pin).subscribe({
       next: room => {
         this.room.set(room);
+        this.selectedAudioTrackUrl.set(room.audioTracks[0]?.url ?? null);
         this.loading.set(false);
         window.setTimeout(() => {
           const video = this.videoPlayer?.nativeElement;
           if (video) {
             video.currentTime = room.playbackTimeSeconds;
+            this.syncExternalAudio();
           }
         });
         this.connect();
@@ -101,6 +105,35 @@ export class Watch implements OnDestroy {
       default:
         return 'rgba(0, 0, 0, 0.42)';
     }
+  }
+
+  handleVideoPlay(): void {
+    this.syncExternalAudio(true);
+    this.sendSync('play', true);
+  }
+
+  handleVideoPause(): void {
+    this.externalAudio?.nativeElement.pause();
+    this.sendSync('pause', true);
+  }
+
+  handleVideoSeeked(): void {
+    this.syncExternalAudio();
+    this.sendSync('seek', true);
+  }
+
+  handleVideoTimeUpdate(): void {
+    this.syncExternalAudio();
+    this.sendSync('time');
+  }
+
+  handleVideoVolumeChange(): void {
+    this.syncExternalAudio();
+  }
+
+  selectAudioTrack(url: string): void {
+    this.selectedAudioTrackUrl.set(url || null);
+    window.setTimeout(() => this.syncExternalAudio(true));
   }
 
   askCloseRoom(): void {
@@ -184,7 +217,37 @@ export class Watch implements OnDestroy {
       video.pause();
     }
 
+    this.syncExternalAudio(message.playing);
+
     window.setTimeout(() => this.applyingRemote = false, 250);
+  }
+
+  private syncExternalAudio(playWhenVideoPlays = false): void {
+    const video = this.videoPlayer?.nativeElement;
+    const audio = this.externalAudio?.nativeElement;
+    const hasExternalAudio = !!this.selectedAudioTrackUrl();
+
+    if (video) {
+      video.muted = hasExternalAudio;
+    }
+
+    if (!video || !audio || !hasExternalAudio) {
+      return;
+    }
+
+    if (Math.abs(audio.currentTime - video.currentTime) > 0.35) {
+      audio.currentTime = video.currentTime;
+    }
+
+    audio.volume = video.volume;
+    audio.muted = false;
+
+    if (playWhenVideoPlays || !video.paused) {
+      void audio.play().catch(() => undefined);
+      return;
+    }
+
+    audio.pause();
   }
 
   private websocketUrl(): string {

@@ -35,41 +35,55 @@
           controls
           playsinline
           crossorigin="anonymous"
-          (play)="sendSync('play', true)"
-          (pause)="sendSync('pause', true)"
-          (seeked)="sendSync('seek', true)"
-          (timeupdate)="sendSync('time')"
+          (play)="handleVideoPlay()"
+          (pause)="handleVideoPause()"
+          (seeked)="handleVideoSeeked()"
+          (timeupdate)="handleVideoTimeUpdate()"
+          (volumechange)="handleVideoVolumeChange()"
         >
           <source [src]="room()!.videoUrl" [type]="room()!.videoContentType" />
           @for (track of room()!.subtitleTracks; track track.url; let first = $first) {
             <track kind="subtitles" [label]="track.label" [srclang]="track.language" [src]="track.url" [default]="first" />
           }
         </video>
+        @if (selectedAudioTrackUrl()) {
+          <audio #externalAudio [src]="selectedAudioTrackUrl()!" preload="auto" crossorigin="anonymous"></audio>
+        }
       </div>
 
-      @if (room()!.subtitleTracks.length) {
+      @if (room()!.audioTracks.length || room()!.subtitleTracks.length) {
         <div class="rounded-lg border border-white/10 bg-base-100 p-4">
-          <div class="grid gap-4 md:grid-cols-[1fr_auto] md:items-center">
-            <div>
-              <p class="text-sm font-semibold text-base-content/80">Sous-titres</p>
-              <p class="text-sm text-base-content/55">Reglage de l'apparence du texte affiche sur la video.</p>
-            </div>
-
-            <div class="grid gap-3 md:min-w-96 md:grid-cols-[1fr_12rem] md:items-end">
-              <label class="grid gap-2">
-                <span class="text-xs font-semibold uppercase tracking-[0.18em] text-base-content/50">Taille</span>
-                <input class="range range-primary range-sm" type="range" min="75" max="145" step="5" [ngModel]="subtitleSize()" (ngModelChange)="subtitleSize.set(+$event)" />
-              </label>
-
-              <label class="grid gap-2">
-                <span class="text-xs font-semibold uppercase tracking-[0.18em] text-base-content/50">Fond</span>
-                <select class="select select-bordered select-sm" [ngModel]="subtitleBackground()" (ngModelChange)="subtitleBackground.set($event)">
-                  <option value="soft">Discret</option>
-                  <option value="solid">Contraste</option>
-                  <option value="none">Aucun</option>
+          <div class="grid gap-5 lg:grid-cols-[1fr_1.5fr] lg:items-end">
+            @if (room()!.audioTracks.length) {
+              <div class="grid gap-2">
+                <span class="text-sm font-semibold text-base-content/80">Audio</span>
+                <select class="select select-bordered w-full" [ngModel]="selectedAudioTrackUrl()" (ngModelChange)="selectAudioTrack($event)">
+                  <option value="">Audio original</option>
+                  @for (track of room()!.audioTracks; track track.url) {
+                    <option [value]="track.url">{{ track.label }}</option>
+                  }
                 </select>
-              </label>
-            </div>
+                <p class="text-xs text-base-content/50">Les pistes extraites sont converties en AAC pour une meilleure compatibilite navigateur.</p>
+              </div>
+            }
+
+            @if (room()!.subtitleTracks.length) {
+              <div class="grid gap-3 md:grid-cols-[1fr_12rem] md:items-end">
+                <label class="grid gap-2">
+                  <span class="text-xs font-semibold uppercase tracking-[0.18em] text-base-content/50">Taille sous-titres</span>
+                  <input class="range range-primary range-sm" type="range" min="75" max="145" step="5" [ngModel]="subtitleSize()" (ngModelChange)="subtitleSize.set(+$event)" />
+                </label>
+
+                <label class="grid gap-2">
+                  <span class="text-xs font-semibold uppercase tracking-[0.18em] text-base-content/50">Fond</span>
+                  <select class="select select-bordered select-sm" [ngModel]="subtitleBackground()" (ngModelChange)="subtitleBackground.set($event)">
+                    <option value="soft">Discret</option>
+                    <option value="solid">Contraste</option>
+                    <option value="none">Aucun</option>
+                  </select>
+                </label>
+              </div>
+            }
           </div>
         </div>
       }
@@ -80,8 +94,8 @@
           <p class="font-mono text-lg font-bold">{{ shareCode }}</p>
         </div>
         <div class="rounded-lg border border-white/10 bg-base-100 p-4">
-          <p class="text-sm text-base-content/60">Sous-titres</p>
-          <p class="font-semibold">{{ room()!.subtitleTracks.length }} piste(s) disponible(s)</p>
+          <p class="text-sm text-base-content/60">Pistes</p>
+          <p class="font-semibold">{{ room()!.audioTracks.length }} audio / {{ room()!.subtitleTracks.length }} sous-titre(s)</p>
         </div>
         <div class="rounded-lg border border-white/10 bg-base-100 p-4">
           <p class="text-sm text-base-content/60">Fin de visionnage</p>
