@@ -28,6 +28,10 @@ export class WatchRoomService {
     return this.http.post<WatchRoomAccessResponse>(`${this.apiUrl}/${shareCode}/access`, {pin});
   }
 
+  retryRoom(shareCode: string, pin: string) {
+    return this.http.post<WatchRoomAccessResponse>(`${this.apiUrl}/${shareCode}/retry`, {pin});
+  }
+
   closeRoom(shareCode: string, pin: string) {
     return this.http.post<{shareCode: string; closed: boolean}>(`${this.apiUrl}/${shareCode}/close`, {pin});
   }

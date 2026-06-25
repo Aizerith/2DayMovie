@@ -46,6 +46,14 @@ public class WatchRoomController {
         return watchRoomService.access(shareCode, request);
     }
 
+    @PostMapping("/{shareCode}/retry")
+    public WatchRoomAccessResponse retry(
+            @PathVariable String shareCode,
+            @Valid @RequestBody AccessWatchRoomRequest request
+    ) {
+        return watchRoomService.retryPreparation(shareCode, request);
+    }
+
     @PostMapping("/{shareCode}/close")
     public CloseWatchRoomResponse close(
             @PathVariable String shareCode,

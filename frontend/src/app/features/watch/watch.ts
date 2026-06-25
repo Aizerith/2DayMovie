@@ -45,6 +45,7 @@ export class Watch implements OnDestroy, OnInit {
   readonly selectedAudioTrackUrl = signal<string | null>(null);
   readonly closeConfirmationOpen = signal(false);
   readonly closing = signal(false);
+  readonly retrying = signal(false);
   readonly roomMessage = signal<string | null>(null);
   readonly participants = signal<PresenceParticipant[]>([]);
   readonly participantName = signal('');
@@ -177,6 +178,25 @@ export class Watch implements OnDestroy, OnInit {
 
         this.closing.set(false);
         this.notificationService.error('Impossible de cloturer le salon pour le moment.');
+      }
+    });
+  }
+
+  retryPreparation(): void {
+    if (this.retrying()) {
+      return;
+    }
+
+    this.retrying.set(true);
+    this.watchRoomService.retryRoom(this.shareCode(), this.pin()).subscribe({
+      next: room => {
+        this.retrying.set(false);
+        this.notificationService.success('Conversion relancee.');
+        this.applyRoom(room);
+      },
+      error: () => {
+        this.retrying.set(false);
+        this.notificationService.error('Impossible de relancer la conversion pour le moment.');
       }
     });
   }

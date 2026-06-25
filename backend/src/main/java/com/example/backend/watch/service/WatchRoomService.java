@@ -189,6 +189,46 @@ public class WatchRoomService {
     }
 
     @Transactional
+    public WatchRoomAccessResponse retryPreparation(String shareCode, AccessWatchRoomRequest request) {
+        WatchRoom room = findAndVerifyPin(shareCode, request.pin());
+        if (room.getStatus() != WatchRoomStatus.FAILED) {
+            throw new IllegalArgumentException("La conversion ne peut etre relancee que si elle a echoue");
+        }
+
+        StatObjectResponse videoStat = statObject(room.getVideoObjectKey());
+        room.setVideoSizeBytes(videoStat.size());
+        room.setVideoEtag(videoStat.etag());
+
+        Set<String> objectKeysToDelete = new LinkedHashSet<>();
+        if (StringUtils.hasText(room.getPlaybackVideoObjectKey())) {
+            objectKeysToDelete.add(room.getPlaybackVideoObjectKey());
+        }
+        subtitleTrackRepository.findAllByRoomOrderByDisplayOrderAsc(room)
+                .stream()
+                .map(WatchSubtitleTrack::getObjectKey)
+                .filter(objectKey -> StringUtils.hasText(objectKey) && !objectKey.equals(room.getSubtitleObjectKey()))
+                .forEach(objectKeysToDelete::add);
+        audioTrackRepository.findAllByRoomOrderByDisplayOrderAsc(room)
+                .stream()
+                .map(WatchAudioTrack::getObjectKey)
+                .filter(StringUtils::hasText)
+                .forEach(objectKeysToDelete::add);
+
+        room.setPlaybackVideoObjectKey(null);
+        room.setPlaybackVideoContentType(null);
+        room.setPlaybackVideoSizeBytes(null);
+        room.setPlaybackVideoEtag(null);
+        refreshUploadedSubtitleTrack(room);
+        audioTrackRepository.deleteAllByRoom(room);
+        room.setStatus(WatchRoomStatus.PROCESSING);
+        log.info("Room {} video preparation retry queued", room.getShareCode());
+
+        deleteObjectsAfterCommit(room.getShareCode(), objectKeysToDelete);
+        startVideoPreparation(room);
+        return toAccessResponse(room);
+    }
+
+    @Transactional
     public void close(String shareCode, AccessWatchRoomRequest request) {
         log.info("Closing room {}", shareCode);
         WatchRoom room = findAndVerifyPin(shareCode, request.pin());
@@ -471,6 +511,20 @@ public class WatchRoomService {
         }
         deleteObjectBestEffort(preparedMedia.playbackVideoObjectKey());
         deleteExtractedMedia(preparedMedia.tracks());
+    }
+
+    private void deleteObjectsAfterCommit(String shareCode, Set<String> objectKeys) {
+        if (objectKeys.isEmpty()) {
+            return;
+        }
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                log.info("Room {} retry scheduled {} stale object(s) for deletion", shareCode, objectKeys.size());
+                CompletableFuture.runAsync(() -> objectKeys.forEach(WatchRoomService.this::deleteObjectBestEffort));
+            }
+        });
     }
 
     private void notifyRoomClosedAfterCommit(String shareCode, Set<String> objectKeys) {
