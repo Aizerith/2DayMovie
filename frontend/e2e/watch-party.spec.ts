@@ -127,7 +127,9 @@ test.describe('watch party', () => {
     await page.getByRole('button', {name: 'Regarder'}).click();
 
     await expect(page.getByRole('heading', {name: 'Movie night'})).toBeVisible();
-    await expect(page.getByText('Les pistes extraites')).toBeVisible();
+    await expect(page.getByText('Reglages lecture')).toBeVisible();
+    await expect(page.getByText('Piste audio')).toBeVisible();
+    await expect(page.getByText('AAC compatible navigateur')).toBeVisible();
     await expect(page.locator('video')).toBeVisible();
     await expect(page.locator('select').first()).toContainText('Francais');
     await page.getByRole('button', {name: 'Clore le salon'}).click();
