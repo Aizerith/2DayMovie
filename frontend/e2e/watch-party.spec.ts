@@ -96,12 +96,7 @@ test.describe('watch party', () => {
         status: 200
       });
     });
-    await page.route('**/*', async route => {
-      if (!route.request().url().includes('/close')) {
-        await route.fallback();
-        return;
-      }
-
+    await page.route(`**/api/rooms/${room.shareCode}/close`, async route => {
       if (route.request().method() === 'OPTIONS') {
         await route.fulfill({
           body: '',
@@ -134,7 +129,11 @@ test.describe('watch party', () => {
     await expect(page.locator('select').first()).toContainText('Francais');
     await page.getByRole('button', {name: 'Clore le salon'}).click();
     await expect(page.getByRole('heading', {name: 'Clore le salon ?'})).toBeVisible();
+    const closeResponse = page.waitForResponse(response =>
+      response.url().includes(`/api/rooms/${room.shareCode}/close`) && response.status() === 200
+    );
     await page.getByRole('button', {name: 'Confirmer la fermeture'}).click();
+    await closeResponse;
     await expect(page).toHaveURL(/\/$/);
   });
 });
