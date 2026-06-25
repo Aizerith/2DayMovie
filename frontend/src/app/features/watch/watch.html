@@ -103,50 +103,61 @@
       </div>
 
       @if (room()!.audioTracks.length || room()!.subtitleTracks.length) {
-        <div class="rounded-lg border border-white/10 bg-base-100 p-4">
-          <div class="grid gap-5 lg:grid-cols-[1fr_1.5fr] lg:items-end">
+        <div class="rounded-lg border border-white/10 bg-base-100/95 p-4 shadow-xl shadow-black/20">
+          <div class="mb-4 flex items-center justify-between gap-3">
+            <div>
+              <p class="text-sm font-bold text-base-content/90">Reglages lecture</p>
+              <p class="text-xs text-base-content/45">Audio et sous-titres du salon</p>
+            </div>
+          </div>
+
+          <div class="grid gap-3 lg:grid-cols-3">
             @if (room()!.audioTracks.length) {
-              <div class="grid gap-2">
-                <span class="text-sm font-semibold text-base-content/80">Audio</span>
-                <select class="select select-bordered w-full" [ngModel]="selectedAudioTrackUrl()" (ngModelChange)="selectAudioTrack($event)">
+              <label class="grid gap-2 rounded-lg border border-white/10 bg-base-200/60 p-3">
+                <span class="text-xs font-semibold uppercase tracking-[0.16em] text-base-content/50">Piste audio</span>
+                <select class="select select-bordered select-sm w-full bg-base-100" [ngModel]="selectedAudioTrackUrl()" (ngModelChange)="selectAudioTrack($event)">
                   <option value="">Audio original</option>
                   @for (track of room()!.audioTracks; track track.url) {
                     <option [value]="track.url">{{ track.label }}</option>
                   }
                 </select>
-                @if (selectedAudioTrackUrl()) {
-                  <div class="grid gap-2 rounded-lg border border-white/10 bg-base-200 p-3">
-                    <div class="flex items-center justify-between gap-3">
-                      <span class="text-xs font-semibold uppercase tracking-[0.18em] text-base-content/50">Volume piste</span>
-                      <button class="btn btn-ghost btn-xs" type="button" (click)="toggleExternalAudioMuted()">
-                        {{ externalAudioMuted() ? 'Reactiver' : 'Muet' }}
-                      </button>
-                    </div>
-                    <input
-                      class="range range-primary range-sm"
-                      type="range"
-                      min="0"
-                      max="100"
-                      step="1"
-                      [ngModel]="externalAudioVolume() * 100"
-                      (ngModelChange)="setExternalAudioVolume($event)"
-                    />
-                  </div>
-                }
-                <p class="text-xs text-base-content/50">Les pistes extraites sont converties en AAC pour une meilleure compatibilite navigateur.</p>
+                <span class="text-xs text-base-content/45">AAC compatible navigateur</span>
+              </label>
+
+              <div class="grid gap-2 rounded-lg border border-white/10 bg-base-200/60 p-3" [class.opacity-50]="!selectedAudioTrackUrl()">
+                <div class="flex items-center justify-between gap-3">
+                  <span class="text-xs font-semibold uppercase tracking-[0.16em] text-base-content/50">Volume piste</span>
+                  <button class="btn btn-ghost btn-xs" type="button" [disabled]="!selectedAudioTrackUrl()" (click)="toggleExternalAudioMuted()">
+                    {{ externalAudioMuted() ? 'Reactiver' : 'Muet' }}
+                  </button>
+                </div>
+                <div class="flex items-center gap-3">
+                  <input
+                    class="range range-primary range-sm"
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="1"
+                    [disabled]="!selectedAudioTrackUrl()"
+                    [ngModel]="externalAudioVolume() * 100"
+                    (ngModelChange)="setExternalAudioVolume($event)"
+                  />
+                  <span class="w-10 text-right text-xs font-bold text-base-content/60">{{ (externalAudioVolume() * 100).toFixed(0) }}%</span>
+                </div>
+                <span class="text-xs text-base-content/45">{{ selectedAudioTrackUrl() ? 'Controle la piste extraite' : 'Disponible avec une piste extraite' }}</span>
               </div>
             }
 
             @if (room()!.subtitleTracks.length) {
-              <div class="grid gap-3 md:grid-cols-[1fr_12rem] md:items-end">
+              <div class="grid gap-3 rounded-lg border border-white/10 bg-base-200/60 p-3 md:grid-cols-[1fr_9rem] md:items-end">
                 <label class="grid gap-2">
-                  <span class="text-xs font-semibold uppercase tracking-[0.18em] text-base-content/50">Taille sous-titres</span>
+                  <span class="text-xs font-semibold uppercase tracking-[0.16em] text-base-content/50">Taille sous-titres</span>
                   <input class="range range-primary range-sm" type="range" min="75" max="145" step="5" [ngModel]="subtitleSize()" (ngModelChange)="subtitleSize.set(+$event)" />
                 </label>
 
                 <label class="grid gap-2">
-                  <span class="text-xs font-semibold uppercase tracking-[0.18em] text-base-content/50">Fond</span>
-                  <select class="select select-bordered select-sm" [ngModel]="subtitleBackground()" (ngModelChange)="subtitleBackground.set($event)">
+                  <span class="text-xs font-semibold uppercase tracking-[0.16em] text-base-content/50">Fond</span>
+                  <select class="select select-bordered select-sm bg-base-100" [ngModel]="subtitleBackground()" (ngModelChange)="subtitleBackground.set($event)">
                     <option value="soft">Discret</option>
                     <option value="solid">Contraste</option>
                     <option value="none">Aucun</option>
