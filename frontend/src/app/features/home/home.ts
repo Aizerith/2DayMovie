@@ -65,10 +65,14 @@ export class Home {
       switchMap(room => this.uploadAssets(room, video, subtitle).pipe(
         last(),
         switchMap(() => this.watchRoomService.completeRoom(room.shareCode, pin)),
-        tap(() => {
+        tap(access => {
           this.createdRoom.set(this.withFrontendShareUrl(room));
           this.uploadProgress.set(100);
-          this.notificationService.success('Salon pret. Le lien peut etre partage.');
+          this.notificationService.success(
+            access.status === 'READY'
+              ? 'Salon pret. Le lien peut etre partage.'
+              : 'Upload termine. La video est en preparation.'
+          );
         })
       )),
       finalize(() => this.creating.set(false))

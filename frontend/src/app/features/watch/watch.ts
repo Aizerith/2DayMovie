@@ -25,6 +25,7 @@ export class Watch implements OnDestroy, OnInit {
   private client?: Client;
   private subscription?: StompSubscription;
   private routeSubscription?: Subscription;
+  private processingPollId?: number;
   private applyingRemote = false;
   private lastSentAt = 0;
 
@@ -53,18 +54,8 @@ export class Watch implements OnDestroy, OnInit {
     this.loading.set(true);
     this.watchRoomService.accessRoom(this.shareCode(), pin).subscribe({
       next: room => {
-        this.roomMessage.set(null);
-        this.room.set(room);
-        this.selectedAudioTrackUrl.set(room.audioTracks[0]?.url ?? null);
         this.loading.set(false);
-        window.setTimeout(() => {
-          const video = this.videoPlayer?.nativeElement;
-          if (video) {
-            video.currentTime = room.playbackTimeSeconds;
-            this.syncExternalAudio();
-          }
-        });
-        this.connect();
+        this.applyRoom(room);
       },
       error: () => {
         this.loading.set(false);
@@ -176,6 +167,7 @@ export class Watch implements OnDestroy, OnInit {
 
   ngOnDestroy(): void {
     this.routeSubscription?.unsubscribe();
+    this.clearProcessingPoll();
     this.subscription?.unsubscribe();
     void this.client?.deactivate();
   }
@@ -218,6 +210,58 @@ export class Watch implements OnDestroy, OnInit {
     });
 
     this.client.activate();
+  }
+
+  private applyRoom(room: WatchRoomAccessResponse): void {
+    this.roomMessage.set(null);
+    this.room.set(room);
+    this.selectedAudioTrackUrl.set(room.audioTracks[0]?.url ?? null);
+
+    if (room.status === 'PROCESSING') {
+      this.scheduleProcessingPoll();
+      return;
+    }
+
+    this.clearProcessingPoll();
+
+    if (room.status === 'FAILED') {
+      this.roomMessage.set('La preparation de la video a echoue.');
+      return;
+    }
+
+    window.setTimeout(() => {
+      const video = this.videoPlayer?.nativeElement;
+      if (video) {
+        video.currentTime = room.playbackTimeSeconds;
+        this.syncExternalAudio();
+      }
+    });
+    this.connect();
+  }
+
+  private scheduleProcessingPoll(): void {
+    this.clearProcessingPoll();
+    this.processingPollId = window.setTimeout(() => {
+      const pin = this.pin().trim();
+      if (!pin || !this.room() || this.room()?.status !== 'PROCESSING') {
+        return;
+      }
+
+      this.watchRoomService.accessRoom(this.shareCode(), pin).subscribe({
+        next: room => this.applyRoom(room),
+        error: () => {
+          this.roomMessage.set('Impossible de verifier la preparation pour le moment.');
+          this.scheduleProcessingPoll();
+        }
+      });
+    }, 5000);
+  }
+
+  private clearProcessingPoll(): void {
+    if (this.processingPollId !== undefined) {
+      window.clearTimeout(this.processingPollId);
+      this.processingPollId = undefined;
+    }
   }
 
   private applyRemote(message: PlaybackSyncMessage): void {
@@ -276,6 +320,7 @@ export class Watch implements OnDestroy, OnInit {
 
     this.subscription?.unsubscribe();
     this.subscription = undefined;
+    this.clearProcessingPoll();
     void this.client?.deactivate();
     this.client = undefined;
     this.room.set(null);

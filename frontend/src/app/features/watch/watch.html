@@ -31,6 +31,21 @@
           </button>
         </div>
       </form>
+    } @else if (room()!.status !== 'READY') {
+      <div class="mx-auto max-w-xl rounded-lg border border-white/10 bg-base-100 p-6 text-center">
+        <div class="space-y-3">
+          @if (room()!.status === 'FAILED') {
+            <p class="text-sm font-semibold uppercase tracking-[0.18em] text-error">Preparation echouee</p>
+            <h2 class="text-2xl font-black">La video ne peut pas etre preparee</h2>
+            <p class="text-sm text-base-content/60">Le fichier original est conserve pour le moment, mais le MP4 compatible navigateur n'a pas pu etre genere.</p>
+          } @else {
+            <p class="text-sm font-semibold uppercase tracking-[0.18em] text-primary">Preparation en cours</p>
+            <h2 class="text-2xl font-black">Conversion de la video</h2>
+            <p class="text-sm text-base-content/60">La video est convertie en MP4 H.264/AAC pour une meilleure compatibilite navigateur. Cette etape peut prendre plusieurs minutes pour un gros fichier.</p>
+            <progress class="progress progress-primary mt-2 w-full"></progress>
+          }
+        </div>
+      </div>
     } @else {
       <div class="overflow-hidden rounded-lg border border-white/10 bg-black shadow-2xl shadow-black/40">
         <video
@@ -47,7 +62,7 @@
           (timeupdate)="handleVideoTimeUpdate()"
           (volumechange)="handleVideoVolumeChange()"
         >
-          <source [src]="room()!.videoUrl" [type]="room()!.videoContentType" />
+          <source [src]="room()!.videoUrl!" [type]="room()!.videoContentType!" />
           @for (track of room()!.subtitleTracks; track track.url; let first = $first) {
             <track kind="subtitles" [label]="track.label" [srclang]="track.language" [src]="track.url" [default]="first" />
           }

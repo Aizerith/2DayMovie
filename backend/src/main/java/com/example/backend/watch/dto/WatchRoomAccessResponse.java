@@ -10,6 +10,7 @@ public record WatchRoomAccessResponse(
         List<SubtitleTrackResponse> subtitleTracks,
         List<AudioTrackResponse> audioTracks,
         String videoContentType,
+        String status,
         double playbackTimeSeconds,
         boolean playing
 ) {

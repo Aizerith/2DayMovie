@@ -40,4 +40,4 @@ app:
     bucket: 2daymovie-videos
     public-url-base:
     presigned-expiry-minutes: 15
-    max-file-size-bytes: 21474836480
+    max-file-size-bytes: 26843545600

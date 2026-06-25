@@ -30,6 +30,6 @@ public class AppProperties {
         private String bucket;
         private String publicUrlBase;
         private int presignedExpiryMinutes = 15;
-        private long maxFileSizeBytes = 20L * 1024L * 1024L;
+        private long maxFileSizeBytes = 25L * 1024L * 1024L * 1024L;
     }
 }

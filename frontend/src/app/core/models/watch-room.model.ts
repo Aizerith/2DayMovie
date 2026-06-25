@@ -27,11 +27,12 @@ export interface CreateWatchRoomResponse {
 export interface WatchRoomAccessResponse {
   shareCode: string;
   title: string;
-  videoUrl: string;
+  videoUrl: string | null;
   subtitleUrl: string | null;
   subtitleTracks: SubtitleTrackResponse[];
   audioTracks: AudioTrackResponse[];
-  videoContentType: string;
+  videoContentType: string | null;
+  status: 'PENDING' | 'PROCESSING' | 'READY' | 'FAILED';
   playbackTimeSeconds: number;
   playing: boolean;
 }

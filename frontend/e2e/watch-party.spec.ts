@@ -29,6 +29,7 @@ test.describe('watch party', () => {
           subtitleTracks: [],
           audioTracks: [],
           videoContentType: 'video/mp4',
+          status: 'READY',
           playbackTimeSeconds: 0,
           playing: false
         },
@@ -45,7 +46,7 @@ test.describe('watch party', () => {
     });
     await page.getByRole('button', {name: 'Creer le lien partage'}).click();
 
-    await expect(page.getByText('Salon pret', {exact: true})).toBeVisible();
+    await expect(page.getByText('Lien pret', {exact: true})).toBeVisible();
     await expect(page.getByText(room.shareUrl)).toBeVisible();
     await expect(page.getByText('PIN', {exact: true})).toBeVisible();
     await expect(page.getByRole('link', {name: 'Ouvrir'})).toHaveAttribute('href', `/watch/${room.shareCode}`);
@@ -84,6 +85,7 @@ test.describe('watch party', () => {
             }
           ],
           videoContentType: 'video/mp4',
+          status: 'READY',
           playbackTimeSeconds: 12,
           playing: false
         },

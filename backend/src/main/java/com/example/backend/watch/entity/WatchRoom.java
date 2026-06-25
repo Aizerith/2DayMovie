@@ -48,6 +48,18 @@ public class WatchRoom {
     @Column(name = "video_etag", length = 255)
     private String videoEtag;
 
+    @Column(name = "playback_video_object_key", unique = true, length = 500)
+    private String playbackVideoObjectKey;
+
+    @Column(name = "playback_video_content_type", length = 255)
+    private String playbackVideoContentType;
+
+    @Column(name = "playback_video_size_bytes")
+    private Long playbackVideoSizeBytes;
+
+    @Column(name = "playback_video_etag", length = 255)
+    private String playbackVideoEtag;
+
     @Column(name = "subtitle_original_filename", length = 255)
     private String subtitleOriginalFilename;
 
