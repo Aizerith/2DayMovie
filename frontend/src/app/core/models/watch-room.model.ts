@@ -33,6 +33,8 @@ export interface WatchRoomAccessResponse {
   audioTracks: AudioTrackResponse[];
   videoContentType: string | null;
   status: 'PENDING' | 'PROCESSING' | 'READY' | 'FAILED';
+  preparationProgressPercent: number;
+  preparationMessage: string;
   playbackTimeSeconds: number;
   playing: boolean;
 }

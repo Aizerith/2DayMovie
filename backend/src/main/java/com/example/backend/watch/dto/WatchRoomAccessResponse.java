@@ -11,6 +11,8 @@ public record WatchRoomAccessResponse(
         List<AudioTrackResponse> audioTracks,
         String videoContentType,
         String status,
+        int preparationProgressPercent,
+        String preparationMessage,
         double playbackTimeSeconds,
         boolean playing
 ) {

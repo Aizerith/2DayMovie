@@ -30,6 +30,8 @@ test.describe('watch party', () => {
           audioTracks: [],
           videoContentType: 'video/mp4',
           status: 'READY',
+          preparationProgressPercent: 100,
+          preparationMessage: 'Pret',
           playbackTimeSeconds: 0,
           playing: false
         },
@@ -86,6 +88,8 @@ test.describe('watch party', () => {
           ],
           videoContentType: 'video/mp4',
           status: 'READY',
+          preparationProgressPercent: 100,
+          preparationMessage: 'Pret',
           playbackTimeSeconds: 12,
           playing: false
         },

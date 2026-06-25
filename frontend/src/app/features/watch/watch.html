@@ -72,7 +72,14 @@
             <p class="text-sm font-semibold uppercase tracking-[0.18em] text-primary">Preparation en cours</p>
             <h2 class="text-2xl font-black">Conversion de la video</h2>
             <p class="text-sm text-base-content/60">La video est convertie en MP4 H.264/AAC pour une meilleure compatibilite navigateur. Cette etape peut prendre plusieurs minutes pour un gros fichier.</p>
-            <progress class="progress progress-primary mt-2 w-full"></progress>
+            <div class="mt-4 rounded-lg border border-white/10 bg-base-200/70 p-4 text-left">
+              <div class="mb-2 flex items-center justify-between gap-3">
+                <span class="text-sm font-semibold text-base-content/75">{{ room()!.preparationMessage || 'Preparation en cours' }}</span>
+                <span class="font-mono text-sm font-black text-primary">{{ room()!.preparationProgressPercent || 0 }}%</span>
+              </div>
+              <progress class="progress progress-primary w-full" max="100" [value]="room()!.preparationProgressPercent || 0"></progress>
+              <p class="mt-2 text-xs text-base-content/45">La page verifie automatiquement l avancement toutes les quelques secondes.</p>
+            </div>
           }
         </div>
       </div>

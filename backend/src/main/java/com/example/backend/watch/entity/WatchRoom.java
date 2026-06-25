@@ -60,6 +60,12 @@ public class WatchRoom {
     @Column(name = "playback_video_etag", length = 255)
     private String playbackVideoEtag;
 
+    @Column(name = "preparation_progress_percent", nullable = false)
+    private int preparationProgressPercent;
+
+    @Column(name = "preparation_message", nullable = false, length = 160)
+    private String preparationMessage;
+
     @Column(name = "subtitle_original_filename", length = 255)
     private String subtitleOriginalFilename;
 
@@ -100,6 +106,7 @@ public class WatchRoom {
         createdAt = now;
         updatedAt = now;
         playbackUpdatedAt = now;
+        preparationMessage = "En attente";
     }
 
     @PreUpdate
