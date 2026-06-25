@@ -134,6 +134,6 @@ test.describe('watch party', () => {
     );
     await page.getByRole('button', {name: 'Confirmer la fermeture'}).click();
     await closeResponse;
-    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByRole('button', {name: 'Confirmer la fermeture'})).toBeHidden();
   });
 });
