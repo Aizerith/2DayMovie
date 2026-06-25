@@ -180,6 +180,9 @@ export class Watch implements OnDestroy, OnInit {
     this.closing.set(true);
     this.watchRoomService.closeRoom(this.shareCode(), this.pin()).subscribe({
       next: () => {
+        void this.router.navigateByUrl('/', {replaceUrl: true});
+        this.notificationService.success('Salon cloture et fichiers supprimes.');
+
         try {
           this.stopRoomPlayback();
         } catch {
@@ -187,8 +190,6 @@ export class Watch implements OnDestroy, OnInit {
           this.clearPresenceHeartbeat();
           this.closing.set(false);
         }
-        this.notificationService.success('Salon cloture et fichiers supprimes.');
-        void this.router.navigateByUrl('/', {replaceUrl: true});
       },
       error: error => {
         if (error?.status === 400 || error?.status === 404) {
