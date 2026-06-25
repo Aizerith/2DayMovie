@@ -4,7 +4,7 @@ import {ActivatedRoute, Router, RouterLink} from '@angular/router';
 import {Client, StompSubscription} from '@stomp/stompjs';
 import {Subscription} from 'rxjs';
 import {environment} from '../../../environments/environment';
-import {PlaybackSyncMessage, WatchRoomAccessResponse} from '../../core/models/watch-room.model';
+import {PlaybackSyncMessage, PresenceMessage, PresenceParticipant, WatchRoomAccessResponse} from '../../core/models/watch-room.model';
 import {NotificationService} from '../../core/services/notification.service';
 import {WatchRoomService} from '../../core/services/watch-room.service';
 
@@ -24,10 +24,13 @@ export class Watch implements OnDestroy, OnInit {
   private readonly clientId = crypto.randomUUID();
   private client?: Client;
   private subscription?: StompSubscription;
+  private presenceSubscription?: StompSubscription;
   private routeSubscription?: Subscription;
   private processingPollId?: number;
+  private presenceHeartbeatId?: number;
   private applyingRemote = false;
   private lastSentAt = 0;
+  private readonly identity = this.createParticipantIdentity();
 
   @ViewChild('videoPlayer') videoPlayer?: ElementRef<HTMLVideoElement>;
   @ViewChild('externalAudio') externalAudio?: ElementRef<HTMLAudioElement>;
@@ -43,6 +46,9 @@ export class Watch implements OnDestroy, OnInit {
   readonly closeConfirmationOpen = signal(false);
   readonly closing = signal(false);
   readonly roomMessage = signal<string | null>(null);
+  readonly participants = signal<PresenceParticipant[]>([]);
+  readonly participantName = signal(this.identity.displayName);
+  readonly participantAvatar = signal(this.identity.avatar);
 
   unlock(): void {
     const pin = this.pin().trim();
@@ -168,7 +174,9 @@ export class Watch implements OnDestroy, OnInit {
   ngOnDestroy(): void {
     this.routeSubscription?.unsubscribe();
     this.clearProcessingPoll();
+    this.leavePresence();
     this.subscription?.unsubscribe();
+    this.presenceSubscription?.unsubscribe();
     void this.client?.deactivate();
   }
 
@@ -203,10 +211,24 @@ export class Watch implements OnDestroy, OnInit {
         this.subscription = this.client?.subscribe(`/topic/rooms/${this.shareCode()}`, message => {
           this.applyRemote(JSON.parse(message.body) as PlaybackSyncMessage);
         });
+        this.presenceSubscription = this.client?.subscribe(`/topic/rooms/${this.shareCode()}/presence`, message => {
+          this.applyPresence(JSON.parse(message.body) as PresenceMessage);
+        });
+        this.sendPresence('join');
+        this.startPresenceHeartbeat();
       },
-      onWebSocketClose: () => this.connected.set(false),
-      onWebSocketError: () => this.connected.set(false),
-      onStompError: () => this.connected.set(false)
+      onWebSocketClose: () => {
+        this.connected.set(false);
+        this.clearPresenceHeartbeat();
+      },
+      onWebSocketError: () => {
+        this.connected.set(false);
+        this.clearPresenceHeartbeat();
+      },
+      onStompError: () => {
+        this.connected.set(false);
+        this.clearPresenceHeartbeat();
+      }
     });
 
     this.client.activate();
@@ -297,6 +319,46 @@ export class Watch implements OnDestroy, OnInit {
     window.setTimeout(() => this.applyingRemote = false, 250);
   }
 
+  private applyPresence(message: PresenceMessage): void {
+    this.participants.set(message.participants ?? []);
+  }
+
+  private sendPresence(event: 'join' | 'heartbeat' | 'leave'): void {
+    if (!this.client?.active || !this.room()) {
+      return;
+    }
+
+    this.client.publish({
+      destination: `/app/rooms/${this.shareCode()}/presence`,
+      body: JSON.stringify({
+        pin: this.pin(),
+        clientId: this.clientId,
+        displayName: this.participantName(),
+        avatar: this.participantAvatar(),
+        event,
+        participants: [],
+        sentAt: Date.now()
+      } satisfies PresenceMessage)
+    });
+  }
+
+  private startPresenceHeartbeat(): void {
+    this.clearPresenceHeartbeat();
+    this.presenceHeartbeatId = window.setInterval(() => this.sendPresence('heartbeat'), 10_000);
+  }
+
+  private clearPresenceHeartbeat(): void {
+    if (this.presenceHeartbeatId !== undefined) {
+      window.clearInterval(this.presenceHeartbeatId);
+      this.presenceHeartbeatId = undefined;
+    }
+  }
+
+  private leavePresence(): void {
+    this.sendPresence('leave');
+    this.clearPresenceHeartbeat();
+  }
+
   private showClosedRoom(message: string): void {
     this.stopRoomPlayback();
     this.roomMessage.set(message);
@@ -318,15 +380,31 @@ export class Watch implements OnDestroy, OnInit {
       audio.load();
     }
 
+    this.leavePresence();
     this.subscription?.unsubscribe();
     this.subscription = undefined;
+    this.presenceSubscription?.unsubscribe();
+    this.presenceSubscription = undefined;
     this.clearProcessingPoll();
+    this.clearPresenceHeartbeat();
     void this.client?.deactivate();
     this.client = undefined;
     this.room.set(null);
+    this.participants.set([]);
     this.selectedAudioTrackUrl.set(null);
     this.closeConfirmationOpen.set(false);
     this.closing.set(false);
+  }
+
+  private createParticipantIdentity(): {displayName: string; avatar: string} {
+    const adjectives = ['Calme', 'Nocturne', 'Vif', 'Discret', 'Libre', 'Curieux', 'Sage', 'Brumeux'];
+    const names = ['Lynx', 'Puma', 'Ocelot', 'Serval', 'Jaguar', 'Panthere', 'Caracal', 'Margay'];
+    const adjective = adjectives[Math.floor(Math.random() * adjectives.length)];
+    const name = names[Math.floor(Math.random() * names.length)];
+    return {
+      displayName: `${name} ${adjective}`,
+      avatar: `${name.slice(0, 1)}${adjective.slice(0, 1)}`
+    };
   }
 
   private syncExternalAudio(playWhenVideoPlays = false): void {

@@ -87,6 +87,7 @@ public class WatchRoomService {
     private final ObjectMapper objectMapper;
     private final PlatformTransactionManager transactionManager;
     private final SimpMessagingTemplate messagingTemplate;
+    private final WatchPresenceService watchPresenceService;
 
     @Qualifier("internalMinioClient")
     private final MinioClient internalMinioClient;
@@ -423,6 +424,7 @@ public class WatchRoomService {
                         "/topic/rooms/" + shareCode,
                         new PlaybackSyncMessage("", "server", 0, false, "closed", System.currentTimeMillis())
                 );
+                watchPresenceService.clearRoom(shareCode);
                 CompletableFuture.runAsync(() -> objectKeys.forEach(WatchRoomService.this::deleteObjectBestEffort));
             }
         });

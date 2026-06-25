@@ -92,8 +92,30 @@ test.describe('watch party', () => {
         status: 200
       });
     });
-    await page.route(`**/api/rooms/${room.shareCode}/close`, async route => {
-      await route.fulfill({json: {shareCode: room.shareCode, closed: true}, status: 200});
+    await page.route('**/*', async route => {
+      if (!route.request().url().includes('/close')) {
+        await route.fallback();
+        return;
+      }
+
+      if (route.request().method() === 'OPTIONS') {
+        await route.fulfill({
+          body: '',
+          status: 204,
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'content-type'
+          }
+        });
+        return;
+      }
+
+      await route.fulfill({
+        json: {shareCode: room.shareCode, closed: true},
+        status: 200,
+        headers: {'Access-Control-Allow-Origin': '*'}
+      });
     });
 
     await page.goto(`/watch/${room.shareCode}`);

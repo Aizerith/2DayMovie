@@ -57,3 +57,20 @@ export interface PlaybackSyncMessage {
   event: string;
   sentAt: number;
 }
+
+export interface PresenceParticipant {
+  clientId: string;
+  displayName: string;
+  avatar: string;
+  joinedAt: number;
+}
+
+export interface PresenceMessage {
+  pin: string;
+  clientId: string;
+  displayName: string;
+  avatar: string;
+  event: string;
+  participants: PresenceParticipant[];
+  sentAt: number;
+}
