@@ -180,7 +180,13 @@ export class Watch implements OnDestroy, OnInit {
     this.closing.set(true);
     this.watchRoomService.closeRoom(this.shareCode(), this.pin()).subscribe({
       next: () => {
-        this.stopRoomPlayback();
+        try {
+          this.stopRoomPlayback();
+        } catch {
+          this.clearProcessingPoll();
+          this.clearPresenceHeartbeat();
+          this.closing.set(false);
+        }
         this.notificationService.success('Salon cloture et fichiers supprimes.');
         void this.router.navigateByUrl('/', {replaceUrl: true});
       },
