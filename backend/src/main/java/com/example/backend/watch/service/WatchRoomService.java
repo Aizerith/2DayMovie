@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.example.backend.common.config.AppProperties;
 import com.example.backend.watch.dto.AccessWatchRoomRequest;
+import com.example.backend.watch.dto.AudioTrackResponse;
 import com.example.backend.watch.dto.CompleteWatchRoomRequest;
 import com.example.backend.watch.dto.CreateWatchRoomRequest;
 import com.example.backend.watch.dto.CreateWatchRoomResponse;
@@ -13,9 +14,11 @@ import com.example.backend.watch.dto.SubtitleTrackResponse;
 import com.example.backend.watch.dto.UploadAssetRequest;
 import com.example.backend.watch.dto.WatchRoomAccessResponse;
 import com.example.backend.watch.entity.SubtitleTrackSource;
+import com.example.backend.watch.entity.WatchAudioTrack;
 import com.example.backend.watch.entity.WatchRoom;
 import com.example.backend.watch.entity.WatchRoomStatus;
 import com.example.backend.watch.entity.WatchSubtitleTrack;
+import com.example.backend.watch.repository.WatchAudioTrackRepository;
 import com.example.backend.watch.repository.WatchRoomRepository;
 import com.example.backend.watch.repository.WatchSubtitleTrackRepository;
 import io.minio.BucketExistsArgs;
@@ -70,6 +73,7 @@ public class WatchRoomService {
 
     private final WatchRoomRepository watchRoomRepository;
     private final WatchSubtitleTrackRepository subtitleTrackRepository;
+    private final WatchAudioTrackRepository audioTrackRepository;
     private final AppProperties appProperties;
     private final PasswordEncoder passwordEncoder;
     private final ObjectMapper objectMapper;
@@ -150,6 +154,7 @@ public class WatchRoomService {
 
     @Transactional
     public void close(String shareCode, AccessWatchRoomRequest request) {
+        log.info("Closing room {}", shareCode);
         WatchRoom room = findAndVerifyPin(shareCode, request.pin());
         Set<String> objectKeys = new LinkedHashSet<>();
 
@@ -160,12 +165,15 @@ public class WatchRoomService {
 
         subtitleTrackRepository.findAllByRoomOrderByDisplayOrderAsc(room)
                 .forEach(track -> objectKeys.add(track.getObjectKey()));
+        audioTrackRepository.findAllByRoomOrderByDisplayOrderAsc(room)
+                .forEach(track -> objectKeys.add(track.getObjectKey()));
 
         for (String objectKey : objectKeys) {
-            deleteObjectIfPresent(objectKey);
+            deleteObjectBestEffort(objectKey);
         }
 
         watchRoomRepository.delete(room);
+        log.info("Room {} closed, {} object(s) scheduled for deletion", shareCode, objectKeys.size());
     }
 
     @Transactional
@@ -194,6 +202,14 @@ public class WatchRoomService {
                         generateDownloadUrl(track.getObjectKey(), "text/vtt")
                 ))
                 .toList();
+        List<AudioTrackResponse> audioTracks = audioTrackRepository.findAllByRoomOrderByDisplayOrderAsc(room)
+                .stream()
+                .map(track -> new AudioTrackResponse(
+                        track.getLabel(),
+                        track.getLanguage(),
+                        generateDownloadUrl(track.getObjectKey(), "audio/mp4")
+                ))
+                .toList();
 
         return new WatchRoomAccessResponse(
                 room.getShareCode(),
@@ -201,6 +217,7 @@ public class WatchRoomService {
                 generateDownloadUrl(room.getVideoObjectKey(), room.getVideoContentType()),
                 subtitleTracks.isEmpty() ? null : subtitleTracks.getFirst().url(),
                 subtitleTracks,
+                audioTracks,
                 room.getVideoContentType(),
                 room.getPlaybackTimeSeconds(),
                 room.isPlaying()
@@ -238,28 +255,29 @@ public class WatchRoomService {
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                CompletableFuture.runAsync(() -> extractAndStoreEmbeddedSubtitleTracks(request));
+                CompletableFuture.runAsync(() -> extractAndStoreEmbeddedTracks(request));
             }
         });
     }
 
-    private void extractAndStoreEmbeddedSubtitleTracks(RoomSubtitleExtractionRequest request) {
-        List<ExtractedSubtitleTrack> extractedTracks = extractEmbeddedSubtitleTracks(request);
+    private void extractAndStoreEmbeddedTracks(RoomSubtitleExtractionRequest request) {
+        ExtractedMediaTracks extractedTracks = extractEmbeddedMediaTracks(request);
 
-        if (extractedTracks.isEmpty()) {
+        if (extractedTracks.subtitleTracks().isEmpty() && extractedTracks.audioTracks().isEmpty()) {
             return;
         }
 
         new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
             WatchRoom room = watchRoomRepository.findById(request.roomId()).orElse(null);
             if (room == null || room.getStatus() != WatchRoomStatus.READY) {
+                deleteExtractedMedia(extractedTracks);
                 return;
             }
 
             List<WatchSubtitleTrack> tracks = new ArrayList<>();
             int order = request.firstOrder();
 
-            for (ExtractedSubtitleTrack extractedTrack : extractedTracks) {
+            for (ExtractedSubtitleTrack extractedTrack : extractedTracks.subtitleTracks()) {
                 tracks.add(buildSubtitleTrack(
                         room,
                         extractedTrack.label(),
@@ -271,11 +289,36 @@ public class WatchRoomService {
             }
 
             subtitleTrackRepository.saveAll(tracks);
-            log.info("Extracted {} embedded subtitle track(s) for room {}", tracks.size(), request.shareCode());
+
+            List<WatchAudioTrack> audioTracks = new ArrayList<>();
+            int audioOrder = 0;
+            for (ExtractedAudioTrack extractedTrack : extractedTracks.audioTracks()) {
+                audioTracks.add(buildAudioTrack(
+                        room,
+                        extractedTrack.label(),
+                        extractedTrack.language(),
+                        extractedTrack.objectKey(),
+                        audioOrder++
+                ));
+            }
+
+            audioTrackRepository.deleteAllByRoom(room);
+            audioTrackRepository.saveAll(audioTracks);
+            log.info(
+                    "Extracted {} embedded subtitle track(s) and {} audio track(s) for room {}",
+                    tracks.size(),
+                    audioTracks.size(),
+                    request.shareCode()
+            );
         });
     }
 
-    private List<ExtractedSubtitleTrack> extractEmbeddedSubtitleTracks(RoomSubtitleExtractionRequest request) {
+    private void deleteExtractedMedia(ExtractedMediaTracks extractedTracks) {
+        extractedTracks.subtitleTracks().forEach(track -> deleteObjectBestEffort(track.objectKey()));
+        extractedTracks.audioTracks().forEach(track -> deleteObjectBestEffort(track.objectKey()));
+    }
+
+    private ExtractedMediaTracks extractEmbeddedMediaTracks(RoomSubtitleExtractionRequest request) {
         Path workingDirectory = null;
 
         try {
@@ -283,10 +326,10 @@ public class WatchRoomService {
             Path videoPath = workingDirectory.resolve("source-" + sanitizePathSegment(request.videoOriginalFilename()));
             downloadObject(request.videoObjectKey(), videoPath);
 
-            List<EmbeddedSubtitleStream> streams = probeSubtitleStreams(videoPath);
-            List<ExtractedSubtitleTrack> tracks = new ArrayList<>();
+            List<ExtractedSubtitleTrack> subtitleTracks = new ArrayList<>();
+            List<ExtractedAudioTrack> audioTracks = new ArrayList<>();
 
-            for (EmbeddedSubtitleStream stream : streams) {
+            for (EmbeddedSubtitleStream stream : probeSubtitleStreams(videoPath)) {
                 Path outputPath = workingDirectory.resolve("subtitle-" + stream.index() + ".vtt");
 
                 if (!extractSubtitle(videoPath, stream.index(), outputPath) || !Files.exists(outputPath) || Files.size(outputPath) == 0) {
@@ -295,13 +338,25 @@ public class WatchRoomService {
 
                 String objectKey = generateSubtitleObjectKey(request.shareCode(), stream.index(), stream.language());
                 uploadSubtitle(outputPath, objectKey);
-                tracks.add(new ExtractedSubtitleTrack(stream.label(), stream.language(), objectKey));
+                subtitleTracks.add(new ExtractedSubtitleTrack(stream.label(), stream.language(), objectKey));
             }
 
-            return tracks;
+            for (EmbeddedAudioStream stream : probeAudioStreams(videoPath)) {
+                Path outputPath = workingDirectory.resolve("audio-" + stream.index() + ".m4a");
+
+                if (!extractAudio(videoPath, stream.index(), outputPath) || !Files.exists(outputPath) || Files.size(outputPath) == 0) {
+                    continue;
+                }
+
+                String objectKey = generateAudioObjectKey(request.shareCode(), stream.index(), stream.language());
+                uploadAudio(outputPath, objectKey);
+                audioTracks.add(new ExtractedAudioTrack(stream.label(), stream.language(), objectKey));
+            }
+
+            return new ExtractedMediaTracks(subtitleTracks, audioTracks);
         } catch (Exception exception) {
-            log.warn("Unable to extract embedded subtitle tracks for room {}", request.shareCode(), exception);
-            return List.of();
+            log.warn("Unable to extract embedded media tracks for room {}", request.shareCode(), exception);
+            return new ExtractedMediaTracks(List.of(), List.of());
         } finally {
             deleteDirectoryQuietly(workingDirectory);
         }
@@ -353,6 +408,50 @@ public class WatchRoomService {
         return subtitleStreams;
     }
 
+    private List<EmbeddedAudioStream> probeAudioStreams(Path videoPath) throws Exception {
+        ProcessResult result = runProcess(List.of(
+                "ffprobe",
+                "-v", "quiet",
+                "-print_format", "json",
+                "-show_streams",
+                "-select_streams", "a",
+                videoPath.toString()
+        ));
+
+        if (result.exitCode() != 0 || !StringUtils.hasText(result.output())) {
+            return List.of();
+        }
+
+        JsonNode streams = objectMapper.readTree(result.output()).path("streams");
+        if (!streams.isArray()) {
+            return List.of();
+        }
+
+        List<EmbeddedAudioStream> audioStreams = new ArrayList<>();
+        int fallbackOrder = 1;
+
+        for (JsonNode stream : streams) {
+            int index = stream.path("index").asInt(-1);
+            if (index < 0) {
+                continue;
+            }
+
+            JsonNode tags = stream.path("tags");
+            String language = normalizeLanguage(tags.path("language").asText(""));
+            String title = tags.path("title").asText("");
+            String label = StringUtils.hasText(title)
+                    ? title.trim()
+                    : "Audio " + (StringUtils.hasText(language) && !"und".equals(language)
+                            ? language.toUpperCase(Locale.ROOT)
+                            : fallbackOrder);
+
+            audioStreams.add(new EmbeddedAudioStream(index, language, label));
+            fallbackOrder++;
+        }
+
+        return audioStreams;
+    }
+
     private boolean extractSubtitle(Path videoPath, int streamIndex, Path outputPath) throws Exception {
         ProcessResult result = runProcess(List.of(
                 "ffmpeg",
@@ -361,6 +460,23 @@ public class WatchRoomService {
                 "-i", videoPath.toString(),
                 "-map", "0:" + streamIndex,
                 "-f", "webvtt",
+                outputPath.toString()
+        ));
+
+        return result.exitCode() == 0;
+    }
+
+    private boolean extractAudio(Path videoPath, int streamIndex, Path outputPath) throws Exception {
+        ProcessResult result = runProcess(List.of(
+                "ffmpeg",
+                "-v", "error",
+                "-y",
+                "-i", videoPath.toString(),
+                "-map", "0:" + streamIndex,
+                "-vn",
+                "-c:a", "aac",
+                "-b:a", "192k",
+                "-movflags", "+faststart",
                 outputPath.toString()
         ));
 
@@ -402,6 +518,19 @@ public class WatchRoomService {
         }
     }
 
+    private void uploadAudio(Path audioPath, String objectKey) throws Exception {
+        try (InputStream inputStream = Files.newInputStream(audioPath)) {
+            internalMinioClient.putObject(
+                    PutObjectArgs.builder()
+                            .bucket(appProperties.getStorage().getBucket())
+                            .object(objectKey)
+                            .contentType("audio/mp4")
+                            .stream(inputStream, Files.size(audioPath), -1)
+                            .build()
+            );
+        }
+    }
+
     private void deleteObjectIfPresent(String objectKey) {
         if (!StringUtils.hasText(objectKey)) {
             return;
@@ -424,6 +553,14 @@ public class WatchRoomService {
         }
     }
 
+    private void deleteObjectBestEffort(String objectKey) {
+        try {
+            deleteObjectIfPresent(objectKey);
+        } catch (Exception exception) {
+            log.warn("Unable to delete object {} while closing room", objectKey, exception);
+        }
+    }
+
     private WatchSubtitleTrack buildSubtitleTrack(
             WatchRoom room,
             String label,
@@ -438,6 +575,22 @@ public class WatchRoomService {
         track.setLanguage(normalizeLanguage(language));
         track.setObjectKey(objectKey);
         track.setSource(source);
+        track.setDisplayOrder(displayOrder);
+        return track;
+    }
+
+    private WatchAudioTrack buildAudioTrack(
+            WatchRoom room,
+            String label,
+            String language,
+            String objectKey,
+            int displayOrder
+    ) {
+        WatchAudioTrack track = new WatchAudioTrack();
+        track.setRoom(room);
+        track.setLabel(StringUtils.hasText(label) ? label.trim() : "Audio");
+        track.setLanguage(normalizeLanguage(language));
+        track.setObjectKey(objectKey);
         track.setDisplayOrder(displayOrder);
         return track;
     }
@@ -584,6 +737,12 @@ public class WatchRoomService {
                 + "-track-" + streamIndex + "-" + normalizeLanguage(language) + ".vtt";
     }
 
+    private String generateAudioObjectKey(String shareCode, int streamIndex, String language) {
+        String dateSegment = LocalDate.now().format(KEY_DATE_FORMATTER);
+        return "rooms/" + shareCode + "/" + dateSegment + "/audio/" + UUID.randomUUID()
+                + "-track-" + streamIndex + "-" + normalizeLanguage(language) + ".m4a";
+    }
+
     private String labelFromFilename(String filename, String fallback) {
         if (!StringUtils.hasText(filename)) {
             return fallback;
@@ -636,7 +795,19 @@ public class WatchRoomService {
     private record EmbeddedSubtitleStream(int index, String language, String label) {
     }
 
+    private record EmbeddedAudioStream(int index, String language, String label) {
+    }
+
+    private record ExtractedMediaTracks(
+            List<ExtractedSubtitleTrack> subtitleTracks,
+            List<ExtractedAudioTrack> audioTracks
+    ) {
+    }
+
     private record ExtractedSubtitleTrack(String label, String language, String objectKey) {
+    }
+
+    private record ExtractedAudioTrack(String label, String language, String objectKey) {
     }
 
     private record RoomSubtitleExtractionRequest(
