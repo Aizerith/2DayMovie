@@ -154,10 +154,14 @@ export class Watch implements OnDestroy {
     this.closing.set(true);
     this.watchRoomService.closeRoom(this.shareCode, this.pin()).subscribe({
       next: () => {
-        this.notificationService.success('Salon cloture et fichiers supprimes.');
-        void this.router.navigateByUrl('/');
+        this.leaveClosedRoom('Salon cloture et fichiers supprimes.');
       },
-      error: () => {
+      error: error => {
+        if (error?.status === 400 || error?.status === 404) {
+          this.leaveClosedRoom('Salon deja ferme.');
+          return;
+        }
+
         this.closing.set(false);
         this.notificationService.error('Impossible de cloturer le salon pour le moment.');
       }
@@ -195,6 +199,11 @@ export class Watch implements OnDestroy {
   }
 
   private applyRemote(message: PlaybackSyncMessage): void {
+    if (message.event === 'closed') {
+      this.leaveClosedRoom('Le salon a ete cloture.');
+      return;
+    }
+
     if (message.clientId === this.clientId) {
       return;
     }
@@ -220,6 +229,33 @@ export class Watch implements OnDestroy {
     this.syncExternalAudio(message.playing);
 
     window.setTimeout(() => this.applyingRemote = false, 250);
+  }
+
+  private leaveClosedRoom(message: string): void {
+    const video = this.videoPlayer?.nativeElement;
+    const audio = this.externalAudio?.nativeElement;
+
+    video?.pause();
+    audio?.pause();
+    if (video) {
+      video.removeAttribute('src');
+      video.load();
+    }
+    if (audio) {
+      audio.removeAttribute('src');
+      audio.load();
+    }
+
+    this.subscription?.unsubscribe();
+    this.subscription = undefined;
+    void this.client?.deactivate();
+    this.client = undefined;
+    this.room.set(null);
+    this.selectedAudioTrackUrl.set(null);
+    this.closeConfirmationOpen.set(false);
+    this.closing.set(false);
+    this.notificationService.success(message);
+    void this.router.navigateByUrl('/', {replaceUrl: true});
   }
 
   private syncExternalAudio(playWhenVideoPlays = false): void {

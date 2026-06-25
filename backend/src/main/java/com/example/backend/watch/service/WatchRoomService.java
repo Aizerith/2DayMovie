@@ -53,6 +53,7 @@ import java.util.concurrent.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -78,6 +79,7 @@ public class WatchRoomService {
     private final PasswordEncoder passwordEncoder;
     private final ObjectMapper objectMapper;
     private final PlatformTransactionManager transactionManager;
+    private final SimpMessagingTemplate messagingTemplate;
 
     @Qualifier("internalMinioClient")
     private final MinioClient internalMinioClient;
@@ -174,6 +176,7 @@ public class WatchRoomService {
 
         watchRoomRepository.delete(room);
         log.info("Room {} closed, {} object(s) scheduled for deletion", shareCode, objectKeys.size());
+        notifyRoomClosedAfterCommit(shareCode);
     }
 
     @Transactional
@@ -316,6 +319,18 @@ public class WatchRoomService {
     private void deleteExtractedMedia(ExtractedMediaTracks extractedTracks) {
         extractedTracks.subtitleTracks().forEach(track -> deleteObjectBestEffort(track.objectKey()));
         extractedTracks.audioTracks().forEach(track -> deleteObjectBestEffort(track.objectKey()));
+    }
+
+    private void notifyRoomClosedAfterCommit(String shareCode) {
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                messagingTemplate.convertAndSend(
+                        "/topic/rooms/" + shareCode,
+                        new PlaybackSyncMessage("", "server", 0, false, "closed", System.currentTimeMillis())
+                );
+            }
+        });
     }
 
     private ExtractedMediaTracks extractEmbeddedMediaTracks(RoomSubtitleExtractionRequest request) {

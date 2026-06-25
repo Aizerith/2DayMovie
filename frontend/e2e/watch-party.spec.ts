@@ -91,7 +91,7 @@ test.describe('watch party', () => {
       });
     });
     await page.route(`**/api/rooms/${room.shareCode}/close`, async route => {
-      await route.fulfill({body: '', status: 204});
+      await route.fulfill({json: {shareCode: room.shareCode, closed: true}, status: 200});
     });
 
     await page.goto(`/watch/${room.shareCode}`);

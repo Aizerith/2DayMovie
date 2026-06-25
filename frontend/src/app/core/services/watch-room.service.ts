@@ -29,6 +29,6 @@ export class WatchRoomService {
   }
 
   closeRoom(shareCode: string, pin: string) {
-    return this.http.post<void>(`${this.apiUrl}/${shareCode}/close`, {pin});
+    return this.http.post<{shareCode: string; closed: boolean}>(`${this.apiUrl}/${shareCode}/close`, {pin});
   }
 }

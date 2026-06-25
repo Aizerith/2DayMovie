@@ -1,6 +1,7 @@
 package com.example.backend.watch.controller;
 
 import com.example.backend.watch.dto.AccessWatchRoomRequest;
+import com.example.backend.watch.dto.CloseWatchRoomResponse;
 import com.example.backend.watch.dto.CompleteWatchRoomRequest;
 import com.example.backend.watch.dto.CreateWatchRoomRequest;
 import com.example.backend.watch.dto.CreateWatchRoomResponse;
@@ -46,11 +47,11 @@ public class WatchRoomController {
     }
 
     @PostMapping("/{shareCode}/close")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void close(
+    public CloseWatchRoomResponse close(
             @PathVariable String shareCode,
             @Valid @RequestBody AccessWatchRoomRequest request
     ) {
         watchRoomService.close(shareCode, request);
+        return new CloseWatchRoomResponse(shareCode, true);
     }
 }
