@@ -1,7 +1,8 @@
-import {Component, ElementRef, OnDestroy, ViewChild, inject, signal} from '@angular/core';
+import {Component, ElementRef, OnDestroy, OnInit, ViewChild, inject, signal} from '@angular/core';
 import {FormsModule} from '@angular/forms';
 import {ActivatedRoute, Router, RouterLink} from '@angular/router';
 import {Client, StompSubscription} from '@stomp/stompjs';
+import {Subscription} from 'rxjs';
 import {environment} from '../../../environments/environment';
 import {PlaybackSyncMessage, WatchRoomAccessResponse} from '../../core/models/watch-room.model';
 import {NotificationService} from '../../core/services/notification.service';
@@ -15,7 +16,7 @@ import {WatchRoomService} from '../../core/services/watch-room.service';
   ],
   templateUrl: './watch.html',
 })
-export class Watch implements OnDestroy {
+export class Watch implements OnDestroy, OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly watchRoomService = inject(WatchRoomService);
@@ -23,13 +24,14 @@ export class Watch implements OnDestroy {
   private readonly clientId = crypto.randomUUID();
   private client?: Client;
   private subscription?: StompSubscription;
+  private routeSubscription?: Subscription;
   private applyingRemote = false;
   private lastSentAt = 0;
 
   @ViewChild('videoPlayer') videoPlayer?: ElementRef<HTMLVideoElement>;
   @ViewChild('externalAudio') externalAudio?: ElementRef<HTMLAudioElement>;
 
-  readonly shareCode = this.route.snapshot.paramMap.get('shareCode') ?? '';
+  readonly shareCode = signal(this.route.snapshot.paramMap.get('shareCode') ?? '');
   readonly pin = signal('');
   readonly room = signal<WatchRoomAccessResponse | null>(null);
   readonly loading = signal(false);
@@ -49,7 +51,7 @@ export class Watch implements OnDestroy {
     }
 
     this.loading.set(true);
-    this.watchRoomService.accessRoom(this.shareCode, pin).subscribe({
+    this.watchRoomService.accessRoom(this.shareCode(), pin).subscribe({
       next: room => {
         this.roomMessage.set(null);
         this.room.set(room);
@@ -93,7 +95,7 @@ export class Watch implements OnDestroy {
     };
 
     this.client?.publish({
-      destination: `/app/rooms/${this.shareCode}/sync`,
+      destination: `/app/rooms/${this.shareCode()}/sync`,
       body: JSON.stringify(message)
     });
   }
@@ -154,7 +156,7 @@ export class Watch implements OnDestroy {
     }
 
     this.closing.set(true);
-    this.watchRoomService.closeRoom(this.shareCode, this.pin()).subscribe({
+    this.watchRoomService.closeRoom(this.shareCode(), this.pin()).subscribe({
       next: () => {
         this.stopRoomPlayback();
         this.notificationService.success('Salon cloture et fichiers supprimes.');
@@ -173,8 +175,24 @@ export class Watch implements OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.routeSubscription?.unsubscribe();
     this.subscription?.unsubscribe();
     void this.client?.deactivate();
+  }
+
+  ngOnInit(): void {
+    this.routeSubscription = this.route.paramMap.subscribe(params => {
+      const nextShareCode = params.get('shareCode') ?? '';
+      if (nextShareCode === this.shareCode()) {
+        return;
+      }
+
+      this.stopRoomPlayback();
+      this.pin.set('');
+      this.loading.set(false);
+      this.roomMessage.set(null);
+      this.shareCode.set(nextShareCode);
+    });
   }
 
   private connect(): void {
@@ -190,7 +208,7 @@ export class Watch implements OnDestroy {
       debug: () => undefined,
       onConnect: () => {
         this.connected.set(true);
-        this.subscription = this.client?.subscribe(`/topic/rooms/${this.shareCode}`, message => {
+        this.subscription = this.client?.subscribe(`/topic/rooms/${this.shareCode()}`, message => {
           this.applyRemote(JSON.parse(message.body) as PlaybackSyncMessage);
         });
       },
