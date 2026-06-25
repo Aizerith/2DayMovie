@@ -44,17 +44,24 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
+import lombok.extern.slf4j.Slf4j;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.util.StringUtils;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class WatchRoomService {
 
@@ -66,6 +73,7 @@ public class WatchRoomService {
     private final AppProperties appProperties;
     private final PasswordEncoder passwordEncoder;
     private final ObjectMapper objectMapper;
+    private final PlatformTransactionManager transactionManager;
 
     @Qualifier("internalMinioClient")
     private final MinioClient internalMinioClient;
@@ -125,8 +133,9 @@ public class WatchRoomService {
             room.setSubtitleEtag(subtitleStat.etag());
         }
 
-        refreshSubtitleTracks(room);
+        refreshUploadedSubtitleTrack(room);
         room.setStatus(WatchRoomStatus.READY);
+        startEmbeddedSubtitleExtraction(room);
         return toAccessResponse(room);
     }
 
@@ -198,11 +207,10 @@ public class WatchRoomService {
         );
     }
 
-    private void refreshSubtitleTracks(WatchRoom room) {
+    private void refreshUploadedSubtitleTrack(WatchRoom room) {
         subtitleTrackRepository.deleteAllByRoom(room);
 
         List<WatchSubtitleTrack> tracks = new ArrayList<>();
-        int order = 0;
 
         if (room.getSubtitleObjectKey() != null) {
             tracks.add(buildSubtitleTrack(
@@ -211,25 +219,72 @@ public class WatchRoomService {
                     "fr",
                     room.getSubtitleObjectKey(),
                     SubtitleTrackSource.UPLOADED,
-                    order++
+                    0
             ));
         }
 
-        tracks.addAll(extractEmbeddedSubtitleTracks(room, order));
         subtitleTrackRepository.saveAll(tracks);
     }
 
-    private List<WatchSubtitleTrack> extractEmbeddedSubtitleTracks(WatchRoom room, int firstOrder) {
+    private void startEmbeddedSubtitleExtraction(WatchRoom room) {
+        RoomSubtitleExtractionRequest request = new RoomSubtitleExtractionRequest(
+                room.getId(),
+                room.getShareCode(),
+                room.getVideoOriginalFilename(),
+                room.getVideoObjectKey(),
+                room.getSubtitleObjectKey() == null ? 0 : 1
+        );
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                CompletableFuture.runAsync(() -> extractAndStoreEmbeddedSubtitleTracks(request));
+            }
+        });
+    }
+
+    private void extractAndStoreEmbeddedSubtitleTracks(RoomSubtitleExtractionRequest request) {
+        List<ExtractedSubtitleTrack> extractedTracks = extractEmbeddedSubtitleTracks(request);
+
+        if (extractedTracks.isEmpty()) {
+            return;
+        }
+
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            WatchRoom room = watchRoomRepository.findById(request.roomId()).orElse(null);
+            if (room == null || room.getStatus() != WatchRoomStatus.READY) {
+                return;
+            }
+
+            List<WatchSubtitleTrack> tracks = new ArrayList<>();
+            int order = request.firstOrder();
+
+            for (ExtractedSubtitleTrack extractedTrack : extractedTracks) {
+                tracks.add(buildSubtitleTrack(
+                        room,
+                        extractedTrack.label(),
+                        extractedTrack.language(),
+                        extractedTrack.objectKey(),
+                        SubtitleTrackSource.EXTRACTED,
+                        order++
+                ));
+            }
+
+            subtitleTrackRepository.saveAll(tracks);
+            log.info("Extracted {} embedded subtitle track(s) for room {}", tracks.size(), request.shareCode());
+        });
+    }
+
+    private List<ExtractedSubtitleTrack> extractEmbeddedSubtitleTracks(RoomSubtitleExtractionRequest request) {
         Path workingDirectory = null;
 
         try {
             workingDirectory = Files.createTempDirectory("2daymovie-subtitles-");
-            Path videoPath = workingDirectory.resolve("source-" + sanitizePathSegment(room.getVideoOriginalFilename()));
-            downloadObject(room.getVideoObjectKey(), videoPath);
+            Path videoPath = workingDirectory.resolve("source-" + sanitizePathSegment(request.videoOriginalFilename()));
+            downloadObject(request.videoObjectKey(), videoPath);
 
             List<EmbeddedSubtitleStream> streams = probeSubtitleStreams(videoPath);
-            List<WatchSubtitleTrack> tracks = new ArrayList<>();
-            int order = firstOrder;
+            List<ExtractedSubtitleTrack> tracks = new ArrayList<>();
 
             for (EmbeddedSubtitleStream stream : streams) {
                 Path outputPath = workingDirectory.resolve("subtitle-" + stream.index() + ".vtt");
@@ -238,20 +293,14 @@ public class WatchRoomService {
                     continue;
                 }
 
-                String objectKey = generateSubtitleObjectKey(room.getShareCode(), stream.index(), stream.language());
+                String objectKey = generateSubtitleObjectKey(request.shareCode(), stream.index(), stream.language());
                 uploadSubtitle(outputPath, objectKey);
-                tracks.add(buildSubtitleTrack(
-                        room,
-                        stream.label(),
-                        stream.language(),
-                        objectKey,
-                        SubtitleTrackSource.EXTRACTED,
-                        order++
-                ));
+                tracks.add(new ExtractedSubtitleTrack(stream.label(), stream.language(), objectKey));
             }
 
             return tracks;
         } catch (Exception exception) {
+            log.warn("Unable to extract embedded subtitle tracks for room {}", request.shareCode(), exception);
             return List.of();
         } finally {
             deleteDirectoryQuietly(workingDirectory);
@@ -585,6 +634,18 @@ public class WatchRoomService {
     }
 
     private record EmbeddedSubtitleStream(int index, String language, String label) {
+    }
+
+    private record ExtractedSubtitleTrack(String label, String language, String objectKey) {
+    }
+
+    private record RoomSubtitleExtractionRequest(
+            Long roomId,
+            String shareCode,
+            String videoOriginalFilename,
+            String videoObjectKey,
+            int firstOrder
+    ) {
     }
 
     private record ProcessResult(int exitCode, String output) {
