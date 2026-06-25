@@ -158,6 +158,7 @@ public class WatchRoomService {
     public void close(String shareCode, AccessWatchRoomRequest request) {
         log.info("Closing room {}", shareCode);
         WatchRoom room = findAndVerifyPin(shareCode, request.pin());
+        Long roomId = room.getId();
         Set<String> objectKeys = new LinkedHashSet<>();
 
         objectKeys.add(room.getVideoObjectKey());
@@ -170,13 +171,18 @@ public class WatchRoomService {
         audioTrackRepository.findAllByRoomOrderByDisplayOrderAsc(room)
                 .forEach(track -> objectKeys.add(track.getObjectKey()));
 
-        for (String objectKey : objectKeys) {
-            deleteObjectBestEffort(objectKey);
+        audioTrackRepository.deleteAllByRoom(room);
+        subtitleTrackRepository.deleteAllByRoom(room);
+        audioTrackRepository.flush();
+        subtitleTrackRepository.flush();
+        watchRoomRepository.delete(room);
+        watchRoomRepository.flush();
+
+        if (watchRoomRepository.existsById(roomId)) {
+            throw new IllegalStateException("Room could not be deleted");
         }
 
-        watchRoomRepository.delete(room);
-        log.info("Room {} closed, {} object(s) scheduled for deletion", shareCode, objectKeys.size());
-        notifyRoomClosedAfterCommit(shareCode);
+        notifyRoomClosedAfterCommit(shareCode, objectKeys);
     }
 
     @Transactional
@@ -321,14 +327,16 @@ public class WatchRoomService {
         extractedTracks.audioTracks().forEach(track -> deleteObjectBestEffort(track.objectKey()));
     }
 
-    private void notifyRoomClosedAfterCommit(String shareCode) {
+    private void notifyRoomClosedAfterCommit(String shareCode, Set<String> objectKeys) {
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
+                log.info("Room {} closed in database, {} object(s) scheduled for deletion", shareCode, objectKeys.size());
                 messagingTemplate.convertAndSend(
                         "/topic/rooms/" + shareCode,
                         new PlaybackSyncMessage("", "server", 0, false, "closed", System.currentTimeMillis())
                 );
+                CompletableFuture.runAsync(() -> objectKeys.forEach(WatchRoomService.this::deleteObjectBestEffort));
             }
         });
     }
