@@ -43,6 +43,8 @@ export class Watch implements OnDestroy, OnInit {
   readonly subtitleSize = signal(100);
   readonly subtitleBackground = signal<'soft' | 'solid' | 'none'>('soft');
   readonly selectedAudioTrackUrl = signal<string | null>(null);
+  readonly externalAudioVolume = signal(1);
+  readonly externalAudioMuted = signal(false);
   readonly closeConfirmationOpen = signal(false);
   readonly closing = signal(false);
   readonly retrying = signal(false);
@@ -137,6 +139,18 @@ export class Watch implements OnDestroy, OnInit {
   selectAudioTrack(url: string): void {
     this.selectedAudioTrackUrl.set(url || null);
     window.setTimeout(() => this.syncExternalAudio(true));
+  }
+
+  setExternalAudioVolume(value: number | string): void {
+    const volume = Math.min(1, Math.max(0, Number(value) / 100));
+    this.externalAudioVolume.set(Number.isFinite(volume) ? volume : 1);
+    this.externalAudioMuted.set(volume === 0);
+    this.syncExternalAudio();
+  }
+
+  toggleExternalAudioMuted(): void {
+    this.externalAudioMuted.update(muted => !muted);
+    this.syncExternalAudio();
   }
 
   askCloseRoom(): void {
@@ -455,8 +469,8 @@ export class Watch implements OnDestroy, OnInit {
       audio.currentTime = video.currentTime;
     }
 
-    audio.volume = video.volume;
-    audio.muted = false;
+    audio.volume = this.externalAudioVolume();
+    audio.muted = this.externalAudioMuted();
 
     if (playWhenVideoPlays || !video.paused) {
       void audio.play().catch(() => undefined);

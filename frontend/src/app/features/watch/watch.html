@@ -114,6 +114,25 @@
                     <option [value]="track.url">{{ track.label }}</option>
                   }
                 </select>
+                @if (selectedAudioTrackUrl()) {
+                  <div class="grid gap-2 rounded-lg border border-white/10 bg-base-200 p-3">
+                    <div class="flex items-center justify-between gap-3">
+                      <span class="text-xs font-semibold uppercase tracking-[0.18em] text-base-content/50">Volume piste</span>
+                      <button class="btn btn-ghost btn-xs" type="button" (click)="toggleExternalAudioMuted()">
+                        {{ externalAudioMuted() ? 'Reactiver' : 'Muet' }}
+                      </button>
+                    </div>
+                    <input
+                      class="range range-primary range-sm"
+                      type="range"
+                      min="0"
+                      max="100"
+                      step="1"
+                      [ngModel]="externalAudioVolume() * 100"
+                      (ngModelChange)="setExternalAudioVolume($event)"
+                    />
+                  </div>
+                }
                 <p class="text-xs text-base-content/50">Les pistes extraites sont converties en AAC pour une meilleure compatibilite navigateur.</p>
               </div>
             }
