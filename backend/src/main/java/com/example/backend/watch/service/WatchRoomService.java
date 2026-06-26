@@ -103,6 +103,8 @@ public class WatchRoomService {
     @EventListener(ApplicationReadyEvent.class)
     @Transactional
     public void failInterruptedVideoPreparations() {
+        cleanupAbandonedPreparationDirectories();
+
         List<WatchRoom> interruptedRooms = watchRoomRepository.findAllByStatus(WatchRoomStatus.PROCESSING);
         if (interruptedRooms.isEmpty()) {
             return;
@@ -1233,6 +1235,25 @@ public class WatchRoomService {
                 }
             });
         } catch (Exception ignored) {
+        }
+    }
+
+    private void cleanupAbandonedPreparationDirectories() {
+        Path tempDirectory = Path.of(System.getProperty("java.io.tmpdir"));
+        if (!Files.isDirectory(tempDirectory)) {
+            return;
+        }
+
+        try (var paths = Files.list(tempDirectory)) {
+            paths
+                    .filter(Files::isDirectory)
+                    .filter(path -> path.getFileName().toString().startsWith("2daymovie-prepare-"))
+                    .forEach(path -> {
+                        log.info("Deleting abandoned preparation directory {}", path);
+                        deleteDirectoryQuietly(path);
+                    });
+        } catch (Exception exception) {
+            log.warn("Unable to clean abandoned preparation directories in {}", tempDirectory, exception);
         }
     }
 
